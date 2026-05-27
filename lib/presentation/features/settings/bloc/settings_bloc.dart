@@ -65,6 +65,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(SettingsLoading());
     final keys = [
       AppConstants.keyThemeMode,
+      AppConstants.keyLanguage,
       AppConstants.keyUsername,
       AppConstants.keyOpenaiApiKey,
       AppConstants.keyOpenaiBaseUrl,

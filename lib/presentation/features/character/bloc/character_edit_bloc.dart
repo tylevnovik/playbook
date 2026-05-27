@@ -46,7 +46,7 @@ class CharacterEditLoaded extends CharacterEditState {
   CharacterEditLoaded(this.character);
 
   @override
-  List<Object> get props => [if (character != null) character!];
+  List<Object> get props => [?character];
 }
 class CharacterEditSaved extends CharacterEditState {}
 class CharacterEditError extends CharacterEditState {

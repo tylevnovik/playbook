@@ -17,7 +17,7 @@ class ApiFailure extends Failure {
   const ApiFailure(super.message, {this.statusCode});
 
   @override
-  List<Object> get props => [message, if (statusCode != null) statusCode!];
+  List<Object> get props => [message, ?statusCode];
 }
 
 class NetworkFailure extends Failure {

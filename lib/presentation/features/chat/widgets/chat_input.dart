@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/localization/app_localizations.dart';
 
 class ChatInput extends StatefulWidget {
   final Function(String, List<String>) onSend;
   final bool isSending;
 
-  const ChatInput({
-    super.key,
-    required this.onSend,
-    this.isSending = false,
-  });
+  const ChatInput({super.key, required this.onSend, this.isSending = false});
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -55,6 +52,7 @@ class _ChatInputState extends State<ChatInput> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -65,7 +63,9 @@ class _ChatInputState extends State<ChatInput> {
           Container(
             height: 80,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.3,
+            ),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: _selectedAttachmentPaths.length,
@@ -118,7 +118,7 @@ class _ChatInputState extends State<ChatInput> {
             children: [
               IconButton(
                 icon: const Icon(Icons.add_photo_alternate_outlined),
-                tooltip: 'Attach Image',
+                tooltip: loc.get('attachImage'),
                 onPressed: widget.isSending ? null : _pickImage,
               ),
               Expanded(
@@ -126,10 +126,13 @@ class _ChatInputState extends State<ChatInput> {
                   controller: _controller,
                   maxLines: 4,
                   minLines: 1,
-                  decoration: const InputDecoration(
-                    hintText: 'Type a message...',
+                  decoration: InputDecoration(
+                    hintText: loc.get('typeMessage'),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   onSubmitted: (_) => _handleSend(),
                 ),
@@ -140,7 +143,10 @@ class _ChatInputState extends State<ChatInput> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.send),
                 onPressed: widget.isSending ? null : _handleSend,

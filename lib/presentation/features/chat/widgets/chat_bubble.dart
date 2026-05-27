@@ -35,7 +35,7 @@ class ChatBubble extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceVariant,
+              color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -53,7 +53,9 @@ class ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isUser) ...[
@@ -61,21 +63,33 @@ class ChatBubble extends StatelessWidget {
               radius: 16,
               backgroundColor: theme.colorScheme.primaryContainer,
               child: characterAvatar != null && characterAvatar!.isNotEmpty
-                  ? ClipOval(child: Image.network(characterAvatar!, width: 32, height: 32, fit: BoxFit.cover))
-                  : Text(characterName.isNotEmpty ? characterName[0] : '?', style: theme.textTheme.labelMedium),
+                  ? ClipOval(
+                      child: Image.network(
+                        characterAvatar!,
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Text(
+                      characterName.isNotEmpty ? characterName[0] : '?',
+                      style: theme.textTheme.labelMedium,
+                    ),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Column(
-              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isUser
                         ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceVariant,
+                        : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -104,7 +118,9 @@ class ChatBubble extends StatelessWidget {
                           constraints: const BoxConstraints(),
                           padding: EdgeInsets.zero,
                           icon: const Icon(Icons.chevron_left, size: 16),
-                          onPressed: currentBranchIndex > 0 ? onPreviousBranch : null,
+                          onPressed: currentBranchIndex > 0
+                              ? onPreviousBranch
+                              : null,
                         ),
                         Text(
                           '${currentBranchIndex + 1}/$branchCount',
@@ -116,7 +132,9 @@ class ChatBubble extends StatelessWidget {
                           constraints: const BoxConstraints(),
                           padding: EdgeInsets.zero,
                           icon: const Icon(Icons.chevron_right, size: 16),
-                          onPressed: currentBranchIndex < branchCount - 1 ? onNextBranch : null,
+                          onPressed: currentBranchIndex < branchCount - 1
+                              ? onNextBranch
+                              : null,
                         ),
                       ],
                     ),
@@ -129,7 +147,11 @@ class ChatBubble extends StatelessWidget {
             CircleAvatar(
               radius: 16,
               backgroundColor: theme.colorScheme.tertiaryContainer,
-              child: Icon(Icons.person, size: 18, color: theme.colorScheme.onTertiaryContainer),
+              child: Icon(
+                Icons.person,
+                size: 18,
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
             ),
           ],
         ],

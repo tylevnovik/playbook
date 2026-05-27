@@ -14,6 +14,7 @@ import 'package:injectable/injectable.dart' as _i526;
 import 'package:playbook/core/di/modules.dart' as _i878;
 import 'package:playbook/data/datasources/local/character_dao.dart' as _i673;
 import 'package:playbook/data/datasources/local/chat_dao.dart' as _i119;
+import 'package:playbook/data/datasources/local/export_service.dart' as _i952;
 import 'package:playbook/data/datasources/local/message_dao.dart' as _i420;
 import 'package:playbook/data/datasources/local/world_book_dao.dart' as _i652;
 import 'package:playbook/data/datasources/remote/anthropic_provider.dart'
@@ -52,6 +53,7 @@ extension GetItInjectableX on _i174.GetIt {
       () => appModule.sharedPreferences,
       preResolve: true,
     );
+    gh.lazySingleton<_i952.ExportService>(() => _i952.ExportService());
     gh.singleton<_i972.ChatRepository>(
       () =>
           appModule.chatRepository(gh<_i119.ChatDao>(), gh<_i420.MessageDao>()),

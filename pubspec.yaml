@@ -25,6 +25,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   flutter_bloc: any
   get_it: any
   injectable: any
@@ -37,6 +39,7 @@ dependencies:
   flutter_markdown: any
   image_picker: any
   file_picker: any
+  path: any
   path_provider: any
   uuid: any
   google_fonts: any
@@ -57,12 +60,23 @@ dev_dependencies:
   bloc_test: any
   mocktail: any
   flutter_lints: any
+  flutter_launcher_icons: any
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/icon/icon.png"
+  windows:
+    generate: true
+    image_path: "assets/icon/icon.png"
+    icon_size: 48
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
+
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

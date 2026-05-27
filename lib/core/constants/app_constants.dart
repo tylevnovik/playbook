@@ -11,6 +11,7 @@ class AppConstants {
   
   // Storage keys
   static const String keyThemeMode = 'theme_mode';
+  static const String keyLanguage = 'language';
   static const String keyPrimaryColor = 'primary_color';
   static const String keyUsername = 'username';
   static const String keyDefaultProvider = 'default_provider';

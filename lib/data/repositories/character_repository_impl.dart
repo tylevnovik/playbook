@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:dartz/dartz.dart';
 import '../../../core/error/failures.dart';
 import '../../../core/utils/id_generator.dart';
@@ -26,7 +25,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
   Future<Either<Failure, Character>> getCharacter(String id) async {
     try {
       final map = await _dao.getById(id);
-      if (map == null) return const Left(DatabaseFailure('Character not found'));
+      if (map == null) {
+        return const Left(DatabaseFailure('Character not found'));
+      }
       return Right(CharacterModel.fromMap(map));
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -34,7 +35,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
   }
 
   @override
-  Future<Either<Failure, Character>> createCharacter(Character character) async {
+  Future<Either<Failure, Character>> createCharacter(
+    Character character,
+  ) async {
     try {
       final now = DateTime.now();
       final newChar = Character(
@@ -58,7 +61,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
   }
 
   @override
-  Future<Either<Failure, Character>> updateCharacter(Character character) async {
+  Future<Either<Failure, Character>> updateCharacter(
+    Character character,
+  ) async {
     try {
       await _dao.update(character.id, CharacterModel.toMap(character));
       return Right(character);
@@ -78,7 +83,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
   }
 
   @override
-  Future<Either<Failure, List<Character>>> searchCharacters(String query) async {
+  Future<Either<Failure, List<Character>>> searchCharacters(
+    String query,
+  ) async {
     try {
       final maps = await _dao.search(query);
       return Right(maps.map(CharacterModel.fromMap).toList());
@@ -90,7 +97,22 @@ class CharacterRepositoryImpl implements CharacterRepository {
   @override
   Future<Either<Failure, void>> importCharacter(String jsonContent) async {
     try {
-      final character = CharacterModel.fromJson(jsonContent);
+      final source = CharacterModel.fromJson(jsonContent);
+      final now = DateTime.now();
+      final character = Character(
+        id: IdGenerator.generate(),
+        name: source.name,
+        avatarPath: source.avatarPath,
+        description: source.description,
+        greeting: source.greeting,
+        exampleMessages: source.exampleMessages,
+        systemPrompt: source.systemPrompt,
+        tags: source.tags,
+        worldBookId: source.worldBookId,
+        createdAt: now,
+        updatedAt: now,
+        lastChattedAt: null,
+      );
       await _dao.insert(CharacterModel.toMap(character));
       return const Right(null);
     } catch (e) {
@@ -102,7 +124,9 @@ class CharacterRepositoryImpl implements CharacterRepository {
   Future<Either<Failure, String>> exportCharacter(String id) async {
     try {
       final map = await _dao.getById(id);
-      if (map == null) return const Left(DatabaseFailure('Character not found'));
+      if (map == null) {
+        return const Left(DatabaseFailure('Character not found'));
+      }
       final character = CharacterModel.fromMap(map);
       return Right(CharacterModel.toJson(character));
     } catch (e) {

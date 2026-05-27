@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dartz/dartz.dart';
 import '../../../core/error/failures.dart';
 import '../../../core/utils/id_generator.dart';
@@ -25,7 +27,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   Future<Either<Failure, WorldBook>> getWorldBook(String id) async {
     try {
       final map = await _dao.getById(id);
-      if (map == null) return const Left(DatabaseFailure('World book not found'));
+      if (map == null) {
+        return const Left(DatabaseFailure('World book not found'));
+      }
       return Right(WorldBookModel.fromMap(map));
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -33,7 +37,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, WorldBook>> createWorldBook(WorldBook worldBook) async {
+  Future<Either<Failure, WorldBook>> createWorldBook(
+    WorldBook worldBook,
+  ) async {
     try {
       final now = DateTime.now();
       final newBook = WorldBook(
@@ -51,7 +57,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, WorldBook>> updateWorldBook(WorldBook worldBook) async {
+  Future<Either<Failure, WorldBook>> updateWorldBook(
+    WorldBook worldBook,
+  ) async {
     try {
       final updated = WorldBook(
         id: worldBook.id,
@@ -78,7 +86,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, List<WorldBookEntry>>> getEntries(String worldBookId) async {
+  Future<Either<Failure, List<WorldBookEntry>>> getEntries(
+    String worldBookId,
+  ) async {
     try {
       final maps = await _dao.getEntries(worldBookId);
       return Right(maps.map(WorldBookEntryModel.fromMap).toList());
@@ -88,7 +98,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, WorldBookEntry>> createEntry(WorldBookEntry entry) async {
+  Future<Either<Failure, WorldBookEntry>> createEntry(
+    WorldBookEntry entry,
+  ) async {
     try {
       final now = DateTime.now();
       final newEntry = WorldBookEntry(
@@ -111,7 +123,9 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, WorldBookEntry>> updateEntry(WorldBookEntry entry) async {
+  Future<Either<Failure, WorldBookEntry>> updateEntry(
+    WorldBookEntry entry,
+  ) async {
     try {
       final updated = WorldBookEntry(
         id: entry.id,
@@ -143,12 +157,104 @@ class WorldBookRepositoryImpl implements WorldBookRepository {
   }
 
   @override
-  Future<Either<Failure, List<WorldBookEntry>>> matchEntries(String worldBookId, String text) async {
+  Future<Either<Failure, List<WorldBookEntry>>> matchEntries(
+    String worldBookId,
+    String text,
+  ) async {
     try {
       final maps = await _dao.matchEntries(worldBookId, text);
       return Right(maps.map(WorldBookEntryModel.fromMap).toList());
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> exportWorldBook(String id) async {
+    try {
+      final bookMap = await _dao.getById(id);
+      if (bookMap == null) {
+        return const Left(DatabaseFailure('World book not found'));
+      }
+
+      final entryMaps = await _dao.getEntries(id);
+      final payload = {
+        'version': 1,
+        'type': 'playbook_world_book',
+        'exported_at': DateTime.now().toIso8601String(),
+        'world_book': bookMap,
+        'entries': entryMaps,
+      };
+
+      return Right(const JsonEncoder.withIndent('  ').convert(payload));
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, WorldBook>> importWorldBook(String jsonContent) async {
+    try {
+      final decoded = jsonDecode(jsonContent);
+      if (decoded is! Map<String, dynamic>) {
+        return const Left(ValidationFailure('Invalid world book JSON'));
+      }
+
+      final sourceBookMap = decoded['world_book'] ?? decoded['worldBook'];
+      if (sourceBookMap is! Map) {
+        return const Left(
+          ValidationFailure('Invalid world book JSON: missing world_book'),
+        );
+      }
+
+      final sourceBook = WorldBookModel.fromMap(
+        Map<String, dynamic>.from(sourceBookMap),
+      );
+      final rawEntries =
+          decoded['entries'] ?? decoded['world_book_entries'] ?? const [];
+      if (rawEntries is! List) {
+        return const Left(
+          ValidationFailure('Invalid world book JSON: entries must be a list'),
+        );
+      }
+
+      final sourceEntries = rawEntries
+          .map(
+            (entry) => WorldBookEntryModel.fromMap(
+              Map<String, dynamic>.from(entry as Map),
+            ),
+          )
+          .toList();
+
+      final now = DateTime.now();
+      final importedBook = WorldBook(
+        id: IdGenerator.generate(),
+        name: sourceBook.name,
+        description: sourceBook.description,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await _dao.insert(WorldBookModel.toMap(importedBook));
+      for (final sourceEntry in sourceEntries) {
+        final importedEntry = WorldBookEntry(
+          id: IdGenerator.generate(),
+          worldBookId: importedBook.id,
+          name: sourceEntry.name,
+          keywords: sourceEntry.keywords,
+          content: sourceEntry.content,
+          category: sourceEntry.category,
+          priority: sourceEntry.priority,
+          enabled: sourceEntry.enabled,
+          createdAt: now,
+          updatedAt: now,
+        );
+        await _dao.insertEntry(WorldBookEntryModel.toMap(importedEntry));
+      }
+
+      return Right(importedBook);
+    } catch (e) {
+      return Left(ValidationFailure('Invalid world book JSON: $e'));
     }
   }
 }

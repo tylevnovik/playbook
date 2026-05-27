@@ -1,13 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../core/di/injection.dart';
-import '../../../../domain/entities/character.dart';
-import '../../../../domain/entities/world_book.dart';
-import '../../../../domain/repositories/character_repository.dart';
-import '../../../../domain/repositories/world_book_repository.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/localization/app_localizations.dart';
+import '../../../core/utils/file_saver/file_saver.dart';
+import '../../../domain/entities/character.dart';
+import '../../../domain/entities/world_book.dart';
+import '../../../domain/repositories/character_repository.dart';
+import '../../../domain/repositories/world_book_repository.dart';
 import 'bloc/character_edit_bloc.dart';
 
 class CharacterEditPage extends StatefulWidget {
@@ -42,17 +43,14 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
 
   Future<void> _loadWorldBooks() async {
     final result = await getIt<WorldBookRepository>().getAllWorldBooks();
-    result.fold(
-      (failure) => null,
-      (books) {
-        if (mounted) {
-          setState(() {
-            _worldBooks = books;
-            _isLoadingWorldBooks = false;
-          });
-        }
-      },
-    );
+    result.fold((failure) => null, (books) {
+      if (mounted) {
+        setState(() {
+          _worldBooks = books;
+          _isLoadingWorldBooks = false;
+        });
+      }
+    });
   }
 
   @override
@@ -104,16 +102,17 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
       },
       child: BlocConsumer<CharacterEditBloc, CharacterEditState>(
         listener: (context, state) {
+          final loc = AppLocalizations.of(context)!;
           if (state is CharacterEditSaved) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Character saved successfully!')),
+              SnackBar(content: Text(loc.get('characterSaveSuccess'))),
             );
             context.pop();
           }
           if (state is CharacterEditError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
           }
           if (state is CharacterEditLoaded && state.character != null) {
             final char = state.character!;
@@ -128,16 +127,21 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
           }
         },
         builder: (context, state) {
+          final loc = AppLocalizations.of(context)!;
           final isSaving = state is CharacterEditLoading;
 
           return Scaffold(
             appBar: AppBar(
-              title: Text(widget.characterId == null ? 'Create Character' : 'Edit Character'),
+              title: Text(
+                widget.characterId == null
+                    ? loc.get('newCharacterTitle')
+                    : loc.get('editCharacterTitle'),
+              ),
               actions: [
                 if (widget.characterId != null)
                   IconButton(
                     icon: const Icon(Icons.share),
-                    tooltip: 'Export Character',
+                    tooltip: loc.get('exportCharacter'),
                     onPressed: () => _exportJson(context),
                   ),
               ],
@@ -155,30 +159,43 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                             onTap: _pickAvatar,
                             child: CircleAvatar(
                               radius: 50,
-                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                              backgroundImage: _avatarPath != null ? NetworkImage(_avatarPath!) : null,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
+                              backgroundImage: _avatarPath != null
+                                  ? NetworkImage(_avatarPath!)
+                                  : null,
                               child: _avatarPath == null
                                   ? Icon(
                                       Icons.camera_alt,
                                       size: 32,
-                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
                                     )
                                   : null,
                             ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Center(child: Text('Tap to change avatar', style: TextStyle(fontSize: 12))),
+                        Center(
+                          child: Text(
+                            loc.get('tapToChangeAvatar'),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
                         const SizedBox(height: 16),
 
                         // Name field
                         TextFormField(
                           controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Character Name *',
-                            hintText: 'e.g. Albert Einstein',
+                          decoration: InputDecoration(
+                            labelText: loc.get('characterNameRequired'),
+                            hintText: loc.get('characterNameHint'),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? loc.get('nameRequired')
+                              : null,
                         ),
                         const SizedBox(height: 16),
 
@@ -186,11 +203,13 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         TextFormField(
                           controller: _descController,
                           maxLines: 3,
-                          decoration: const InputDecoration(
-                            labelText: 'Description / Character Persona *',
-                            hintText: 'Describe the personality, background, and quirks of the character.',
+                          decoration: InputDecoration(
+                            labelText: loc.get('characterDescriptionRequired'),
+                            hintText: loc.get('characterDescriptionHint'),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Description is required' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? loc.get('descriptionRequired')
+                              : null,
                         ),
                         const SizedBox(height: 16),
 
@@ -198,11 +217,13 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         TextFormField(
                           controller: _greetingController,
                           maxLines: 2,
-                          decoration: const InputDecoration(
-                            labelText: 'Greeting Message *',
-                            hintText: 'First message the character sends when starting a new chat.',
+                          decoration: InputDecoration(
+                            labelText: loc.get('greetingRequired'),
+                            hintText: loc.get('greetingHint'),
                           ),
-                          validator: (val) => val == null || val.trim().isEmpty ? 'Greeting is required' : null,
+                          validator: (val) => val == null || val.trim().isEmpty
+                              ? loc.get('greetingRequiredError')
+                              : null,
                         ),
                         const SizedBox(height: 16),
 
@@ -210,9 +231,9 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         TextFormField(
                           controller: _promptController,
                           maxLines: 4,
-                          decoration: const InputDecoration(
-                            labelText: 'System Prompt Override',
-                            hintText: 'Custom instructions (e.g. "Speak in Shakespearean English.")',
+                          decoration: InputDecoration(
+                            labelText: loc.get('systemPromptOverride'),
+                            hintText: loc.get('systemPromptOverrideHint'),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -221,9 +242,9 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         TextFormField(
                           controller: _exampleController,
                           maxLines: 4,
-                          decoration: const InputDecoration(
-                            labelText: 'Example Messages',
-                            hintText: '<user>: Hello!\n<char>: Greetings, my friend! How can I assist you today?',
+                          decoration: InputDecoration(
+                            labelText: loc.get('exampleMessages'),
+                            hintText: loc.get('exampleMessagesHint'),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -232,20 +253,22 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         _isLoadingWorldBooks
                             ? const Center(child: CircularProgressIndicator())
                             : DropdownButtonFormField<String>(
-                                value: _selectedWorldBookId,
-                                decoration: const InputDecoration(
-                                  labelText: 'World Book',
-                                  hintText: 'Select a World Book to link',
+                                initialValue: _selectedWorldBookId,
+                                decoration: InputDecoration(
+                                  labelText: loc.get('worldBook'),
+                                  hintText: loc.get('selectWorldBookToLink'),
                                 ),
                                 items: [
-                                  const DropdownMenuItem<String>(
+                                  DropdownMenuItem<String>(
                                     value: null,
-                                    child: Text('None'),
+                                    child: Text(loc.get('none')),
                                   ),
-                                  ..._worldBooks.map((book) => DropdownMenuItem<String>(
-                                        value: book.id,
-                                        child: Text(book.name),
-                                      )),
+                                  ..._worldBooks.map(
+                                    (book) => DropdownMenuItem<String>(
+                                      value: book.id,
+                                      child: Text(book.name),
+                                    ),
+                                  ),
                                 ],
                                 onChanged: (val) {
                                   setState(() {
@@ -261,9 +284,9 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                             Expanded(
                               child: TextFormField(
                                 controller: _tagController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Add Tag',
-                                  hintText: 'e.g. historical, sci-fi',
+                                decoration: InputDecoration(
+                                  labelText: loc.get('addTag'),
+                                  hintText: loc.get('addTagHint'),
                                 ),
                                 onFieldSubmitted: _addTag,
                               ),
@@ -280,10 +303,12 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                           spacing: 8.0,
                           runSpacing: 4.0,
                           children: _tags
-                              .map((t) => Chip(
-                                    label: Text(t),
-                                    onDeleted: () => _removeTag(t),
-                                  ))
+                              .map(
+                                (t) => Chip(
+                                  label: Text(t),
+                                  onDeleted: () => _removeTag(t),
+                                ),
+                              )
                               .toList(),
                         ),
                         const SizedBox(height: 24),
@@ -294,7 +319,7 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                           children: [
                             TextButton(
                               onPressed: () => context.pop(),
-                              child: const Text('Cancel'),
+                              child: Text(loc.get('cancel')),
                             ),
                             const SizedBox(width: 16),
                             ElevatedButton(
@@ -306,17 +331,25 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                                     avatarPath: _avatarPath,
                                     description: _descController.text.trim(),
                                     greeting: _greetingController.text.trim(),
-                                    exampleMessages: _exampleController.text.trim().isEmpty ? null : _exampleController.text.trim(),
-                                    systemPrompt: _promptController.text.trim().isEmpty ? null : _promptController.text.trim(),
+                                    exampleMessages:
+                                        _exampleController.text.trim().isEmpty
+                                        ? null
+                                        : _exampleController.text.trim(),
+                                    systemPrompt:
+                                        _promptController.text.trim().isEmpty
+                                        ? null
+                                        : _promptController.text.trim(),
                                     tags: _tags,
                                     worldBookId: _selectedWorldBookId,
                                     createdAt: DateTime.now(),
                                     updatedAt: DateTime.now(),
                                   );
-                                  context.read<CharacterEditBloc>().add(SaveCharacter(char));
+                                  context.read<CharacterEditBloc>().add(
+                                    SaveCharacter(char),
+                                  );
                                 }
                               },
-                              child: const Text('Save'),
+                              child: Text(loc.get('save')),
                             ),
                           ],
                         ),
@@ -330,26 +363,28 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
   }
 
   Future<void> _exportJson(BuildContext context) async {
-    final result = await getIt<CharacterRepository>().exportCharacter(widget.characterId!);
-    result.fold(
-      (failure) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to export character: ${failure.message}')),
-      ),
-      (jsonStr) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Exported Character JSON'),
-            content: SingleChildScrollView(
-              child: SelectableText(jsonStr),
+    final loc = AppLocalizations.of(context)!;
+    final result = await getIt<CharacterRepository>().exportCharacter(
+      widget.characterId!,
+    );
+    if (!context.mounted) return;
+    await result.fold(
+      (failure) async {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${loc.get('exportCharacterFailed')}: ${failure.message}',
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
           ),
+        );
+      },
+      (jsonStr) async {
+        final fileName =
+            'playbook_character_${DateTime.now().millisecondsSinceEpoch}.json';
+        await saveFileContent(jsonStr, fileName);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.get('exportCharacterSuccess'))),
         );
       },
     );

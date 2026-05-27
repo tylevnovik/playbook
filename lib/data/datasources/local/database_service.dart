@@ -1,4 +1,4 @@
-import 'package:sqflite/sqflite.dart';
+import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart';
@@ -18,8 +18,13 @@ class DatabaseService {
     if (kIsWeb) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfiWeb;
+    } else {
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
     }
-    
+
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, AppConstants.dbName);
 
@@ -111,7 +116,9 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_chats_character ON chats(character_id)');
     await db.execute('CREATE INDEX idx_messages_chat ON messages(chat_id)');
     await db.execute('CREATE INDEX idx_messages_parent ON messages(parent_id)');
-    await db.execute('CREATE INDEX idx_entries_worldbook ON world_book_entries(world_book_id)');
+    await db.execute(
+      'CREATE INDEX idx_entries_worldbook ON world_book_entries(world_book_id)',
+    );
   }
 
   static Future<void> close() async {
