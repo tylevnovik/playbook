@@ -150,6 +150,9 @@ class AnthropicProvider implements LlmProvider {
     if (normalized.endsWith('/v1') && path.startsWith('/v1/')) {
       return '$normalized${path.substring(3)}';
     }
+    if (normalized.contains('/v1/')) {
+      return '$normalized$path';
+    }
     return '$normalized$path';
   }
 }

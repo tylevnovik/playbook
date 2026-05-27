@@ -17,7 +17,7 @@ class OpenAiProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async {
     final response = await _dio.post(
-      _joinVersionedPath(_baseUrl(config), '/v1/chat/completions'),
+      _joinOpenAiCompatiblePath(_baseUrl(config), 'chat/completions'),
       options: Options(
         headers: {
           'Authorization': 'Bearer ${config.apiKey}',
@@ -46,7 +46,7 @@ class OpenAiProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async* {
     final response = await _dio.post(
-      _joinVersionedPath(_baseUrl(config), '/v1/chat/completions'),
+      _joinOpenAiCompatiblePath(_baseUrl(config), 'chat/completions'),
       options: Options(
         headers: {
           'Authorization': 'Bearer ${config.apiKey}',
@@ -124,11 +124,21 @@ class OpenAiProvider implements LlmProvider {
     return value;
   }
 
-  String _joinVersionedPath(String baseUrl, String path) {
+  String _joinOpenAiCompatiblePath(String baseUrl, String path) {
     final normalized = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
-    if (normalized.endsWith('/v1') && path.startsWith('/v1/')) {
-      return '$normalized${path.substring(3)}';
+    final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    if (_looksVersioned(normalized)) {
+      return '$normalized/$normalizedPath';
     }
-    return '$normalized$path';
+    return '$normalized/v1/$normalizedPath';
+  }
+
+  bool _looksVersioned(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    final path = uri?.path.toLowerCase() ?? baseUrl.toLowerCase();
+    return path.endsWith('/v1') ||
+        path.contains('/v1/') ||
+        path.endsWith('/openai') ||
+        path.contains('/openai/');
   }
 }

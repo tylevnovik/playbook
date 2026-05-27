@@ -12,5 +12,12 @@ abstract class SettingsRepository {
   Future<Either<Failure, bool?>> getBool(String key);
   Future<Either<Failure, void>> setBool(String key, bool value);
   Future<Either<Failure, LlmConfig>> getLlmConfig(LlmProviderType providerType);
+  Future<Either<Failure, LlmConfig>> getDefaultLlmConfig();
+  Future<Either<Failure, List<LlmProviderProfile>>> getProviderProfiles();
+  Future<Either<Failure, void>> saveProviderProfiles(
+    List<LlmProviderProfile> profiles,
+  );
+  Future<Either<Failure, String>> getDefaultProviderProfileId();
+  Future<Either<Failure, void>> setDefaultProviderProfileId(String id);
   Future<Either<Failure, LlmProviderType>> getDefaultProvider();
 }

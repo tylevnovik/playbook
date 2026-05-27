@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/error/failures.dart';
@@ -91,69 +92,89 @@ class SettingsRepositoryImpl implements SettingsRepository {
     LlmProviderType providerType,
   ) async {
     try {
-      switch (providerType) {
-        case LlmProviderType.openai:
-          final apiKey = _prefs.getString(AppConstants.keyOpenaiApiKey) ?? '';
-          final baseUrl = _stringOrDefault(
-            AppConstants.keyOpenaiBaseUrl,
-            AppConstants.defaultOpenaiBaseUrl,
-          );
-          final model = _stringOrDefault(
-            AppConstants.keyOpenaiModel,
-            AppConstants.defaultOpenaiModel,
-          );
-          return Right(
-            LlmConfig(
-              providerType: LlmProviderType.openai,
-              apiKey: apiKey,
-              baseUrl: baseUrl,
-              model: model,
-              contextWindow: AppConstants.defaultOpenaiContextTokens,
-              maxTokens: AppConstants.defaultOpenaiMaxResponseTokens,
-            ),
-          );
-        case LlmProviderType.anthropic:
-          final apiKey =
-              _prefs.getString(AppConstants.keyAnthropicApiKey) ?? '';
-          final baseUrl = _stringOrDefault(
-            AppConstants.keyAnthropicBaseUrl,
-            AppConstants.defaultAnthropicBaseUrl,
-          );
-          final model = _stringOrDefault(
-            AppConstants.keyAnthropicModel,
-            AppConstants.defaultAnthropicModel,
-          );
-          return Right(
-            LlmConfig(
-              providerType: LlmProviderType.anthropic,
-              apiKey: apiKey,
-              baseUrl: baseUrl,
-              model: model,
-              contextWindow: AppConstants.defaultAnthropicContextTokens,
-              maxTokens: AppConstants.defaultAnthropicMaxResponseTokens,
-            ),
-          );
-        case LlmProviderType.gemini:
-          final apiKey = _prefs.getString(AppConstants.keyGeminiApiKey) ?? '';
-          final baseUrl = _stringOrDefault(
-            AppConstants.keyGeminiBaseUrl,
-            AppConstants.defaultGeminiBaseUrl,
-          );
-          final model = _stringOrDefault(
-            AppConstants.keyGeminiModel,
-            AppConstants.defaultGeminiModel,
-          );
-          return Right(
-            LlmConfig(
-              providerType: LlmProviderType.gemini,
-              apiKey: apiKey,
-              baseUrl: baseUrl,
-              model: model,
-              contextWindow: AppConstants.defaultGeminiContextTokens,
-              maxTokens: AppConstants.defaultGeminiMaxResponseTokens,
-            ),
-          );
+      final profiles = _loadProfiles();
+      final profile = profiles.firstWhere(
+        (item) => item.providerType == providerType,
+        orElse: () => _defaultProfileFor(providerType),
+      );
+      return Right(profile.toConfig());
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LlmConfig>> getDefaultLlmConfig() async {
+    try {
+      final profiles = _loadProfiles();
+      final defaultId = _defaultProfileId(profiles);
+      final profile = profiles.firstWhere(
+        (item) => item.id == defaultId,
+        orElse: () => profiles.first,
+      );
+      return Right(profile.toConfig());
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<LlmProviderProfile>>>
+  getProviderProfiles() async {
+    try {
+      return Right(_loadProfiles());
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> saveProviderProfiles(
+    List<LlmProviderProfile> profiles,
+  ) async {
+    try {
+      final normalized = profiles.isEmpty ? _defaultProfiles() : profiles;
+      await _prefs.setString(
+        AppConstants.keyProviderProfiles,
+        jsonEncode(normalized.map((profile) => profile.toJson()).toList()),
+      );
+
+      final defaultId = _defaultProfileId(normalized);
+      if (!normalized.any((profile) => profile.id == defaultId)) {
+        await _prefs.setString(
+          AppConstants.keyDefaultProviderProfileId,
+          normalized.first.id,
+        );
       }
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> getDefaultProviderProfileId() async {
+    try {
+      return Right(_defaultProfileId(_loadProfiles()));
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> setDefaultProviderProfileId(String id) async {
+    try {
+      await _prefs.setString(AppConstants.keyDefaultProviderProfileId, id);
+      final profiles = _loadProfiles();
+      final selected = profiles.firstWhere(
+        (profile) => profile.id == id,
+        orElse: () => profiles.first,
+      );
+      await _prefs.setString(
+        AppConstants.keyDefaultProvider,
+        selected.providerType.name,
+      );
+      return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }
@@ -162,14 +183,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<Either<Failure, LlmProviderType>> getDefaultProvider() async {
     try {
-      final value =
-          _prefs.getString(AppConstants.keyDefaultProvider) ??
-          LlmProviderType.openai.name;
-      final type = LlmProviderType.values.firstWhere(
-        (e) => e.name == value,
-        orElse: () => LlmProviderType.openai,
+      final profiles = _loadProfiles();
+      final defaultId = _defaultProfileId(profiles);
+      final selected = profiles.firstWhere(
+        (profile) => profile.id == defaultId,
+        orElse: () => profiles.first,
       );
-      return Right(type);
+      return Right(selected.providerType);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }
@@ -179,5 +199,113 @@ class SettingsRepositoryImpl implements SettingsRepository {
     final value = _prefs.getString(key);
     if (value == null || value.trim().isEmpty) return fallback;
     return value.trim();
+  }
+
+  List<LlmProviderProfile> _loadProfiles() {
+    final encoded = _prefs.getString(AppConstants.keyProviderProfiles);
+    if (encoded == null || encoded.trim().isEmpty) {
+      return _defaultProfiles();
+    }
+
+    final decoded = jsonDecode(encoded);
+    if (decoded is! List) return _defaultProfiles();
+    final profiles = decoded
+        .whereType<Map>()
+        .map(
+          (item) =>
+              LlmProviderProfile.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
+    if (profiles.isEmpty) return _defaultProfiles();
+
+    final builtInIds = profiles.map((profile) => profile.id).toSet();
+    for (final builtIn in _defaultProfiles()) {
+      if (!builtInIds.contains(builtIn.id)) {
+        profiles.add(builtIn);
+      }
+    }
+    return profiles;
+  }
+
+  List<LlmProviderProfile> _defaultProfiles() {
+    return [
+      LlmProviderProfile(
+        id: AppConstants.profileOpenaiOfficial,
+        name: 'OpenAI',
+        providerType: LlmProviderType.openai,
+        apiKey: _prefs.getString(AppConstants.keyOpenaiApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyOpenaiBaseUrl,
+          AppConstants.defaultOpenaiBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyOpenaiModel,
+          AppConstants.defaultOpenaiModel,
+        ),
+        contextWindow: AppConstants.defaultOpenaiContextTokens,
+        maxTokens: AppConstants.defaultOpenaiMaxResponseTokens,
+        isBuiltIn: true,
+      ),
+      LlmProviderProfile(
+        id: AppConstants.profileAnthropicOfficial,
+        name: 'Anthropic',
+        providerType: LlmProviderType.anthropic,
+        apiKey: _prefs.getString(AppConstants.keyAnthropicApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyAnthropicBaseUrl,
+          AppConstants.defaultAnthropicBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyAnthropicModel,
+          AppConstants.defaultAnthropicModel,
+        ),
+        contextWindow: AppConstants.defaultAnthropicContextTokens,
+        maxTokens: AppConstants.defaultAnthropicMaxResponseTokens,
+        isBuiltIn: true,
+      ),
+      LlmProviderProfile(
+        id: AppConstants.profileGeminiOfficial,
+        name: 'Google Gemini',
+        providerType: LlmProviderType.gemini,
+        apiKey: _prefs.getString(AppConstants.keyGeminiApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyGeminiBaseUrl,
+          AppConstants.defaultGeminiBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyGeminiModel,
+          AppConstants.defaultGeminiModel,
+        ),
+        contextWindow: AppConstants.defaultGeminiContextTokens,
+        maxTokens: AppConstants.defaultGeminiMaxResponseTokens,
+        isBuiltIn: true,
+      ),
+    ];
+  }
+
+  LlmProviderProfile _defaultProfileFor(LlmProviderType type) {
+    return _defaultProfiles().firstWhere(
+      (profile) => profile.providerType == type,
+      orElse: () => _defaultProfiles().first,
+    );
+  }
+
+  String _defaultProfileId(List<LlmProviderProfile> profiles) {
+    final stored = _prefs.getString(AppConstants.keyDefaultProviderProfileId);
+    if (stored != null && profiles.any((profile) => profile.id == stored)) {
+      return stored;
+    }
+
+    final legacy = _prefs.getString(AppConstants.keyDefaultProvider);
+    final legacyType = LlmProviderType.values.firstWhere(
+      (type) => type.name == legacy,
+      orElse: () => LlmProviderType.openai,
+    );
+    return profiles
+        .firstWhere(
+          (profile) => profile.providerType == legacyType,
+          orElse: () => profiles.first,
+        )
+        .id;
   }
 }

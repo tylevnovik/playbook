@@ -51,9 +51,9 @@ class ApiDiagnosticsService {
     try {
       final response = switch (providerType) {
         LlmProviderType.openai => await _dio.get(
-          _joinVersionedPath(
+          _joinOpenAiCompatiblePath(
             baseUrl,
-            '/v1/models/${Uri.encodeComponent(model)}',
+            'models/${Uri.encodeComponent(model)}',
           ),
           options: Options(headers: _openAiHeaders(apiKey)),
         ),
@@ -106,7 +106,7 @@ class ApiDiagnosticsService {
     try {
       final response = switch (providerType) {
         LlmProviderType.openai => await _dio.get(
-          _joinVersionedPath(baseUrl, '/v1/models'),
+          _joinOpenAiCompatiblePath(baseUrl, 'models'),
           options: Options(headers: _openAiHeaders(apiKey)),
         ),
         LlmProviderType.anthropic => await _dio.get(
@@ -170,6 +170,27 @@ class ApiDiagnosticsService {
     };
   }
 
+  static List<String> fallbackModels(LlmProviderType providerType) {
+    return switch (providerType) {
+      LlmProviderType.openai => const [
+        'gpt-5.5',
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.4-nano',
+      ],
+      LlmProviderType.anthropic => const [
+        'claude-opus-4-7',
+        'claude-sonnet-4-6',
+        'claude-haiku-4-5',
+      ],
+      LlmProviderType.gemini => const [
+        'gemini-3.5-flash',
+        'gemini-3.1-pro',
+        'gemini-3.1-flash',
+      ],
+    };
+  }
+
   static int fallbackContextTokens(LlmProviderType providerType) {
     return switch (providerType) {
       LlmProviderType.openai => AppConstants.defaultOpenaiContextTokens,
@@ -195,6 +216,15 @@ class ApiDiagnosticsService {
     return _joinPath(normalized, path);
   }
 
+  static String _joinOpenAiCompatiblePath(String baseUrl, String path) {
+    final normalized = _withoutTrailingSlash(baseUrl);
+    final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    if (_looksOpenAiVersioned(normalized)) {
+      return '$normalized/$normalizedPath';
+    }
+    return '$normalized/v1/$normalizedPath';
+  }
+
   static String _joinPath(String baseUrl, String path) {
     final normalized = _withoutTrailingSlash(baseUrl);
     final normalizedPath = path.startsWith('/') ? path : '/$path';
@@ -206,6 +236,15 @@ class ApiDiagnosticsService {
     return trimmed.endsWith('/')
         ? trimmed.replaceFirst(RegExp(r'/+$'), '')
         : trimmed;
+  }
+
+  static bool _looksOpenAiVersioned(String baseUrl) {
+    final uri = Uri.tryParse(baseUrl);
+    final path = uri?.path.toLowerCase() ?? baseUrl.toLowerCase();
+    return path.endsWith('/v1') ||
+        path.contains('/v1/') ||
+        path.endsWith('/openai') ||
+        path.contains('/openai/');
   }
 
   static String _geminiModelPath(String model) {

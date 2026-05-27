@@ -11,21 +11,27 @@ class AppConstants {
   static const int defaultRecentMessages = 20;
 
   // Provider defaults
-  static const String defaultOpenaiBaseUrl = 'https://api.openai.com';
-  static const String defaultOpenaiModel = 'gpt-4o-mini';
-  static const int defaultOpenaiContextTokens = 128000;
+  static const String defaultOpenaiBaseUrl = 'https://api.openai.com/v1';
+  static const String defaultOpenaiModel = 'gpt-5.5';
+  static const int defaultOpenaiContextTokens = 1050000;
   static const int defaultOpenaiMaxResponseTokens = 1000;
 
-  static const String defaultAnthropicBaseUrl = 'https://api.anthropic.com';
-  static const String defaultAnthropicModel = 'claude-3-5-sonnet-latest';
-  static const int defaultAnthropicContextTokens = 200000;
+  static const String defaultAnthropicBaseUrl = 'https://api.anthropic.com/v1';
+  static const String defaultAnthropicModel = 'claude-opus-4-7';
+  static const int defaultAnthropicContextTokens = 1000000;
   static const int defaultAnthropicMaxResponseTokens = 1000;
 
   static const String defaultGeminiBaseUrl =
       'https://generativelanguage.googleapis.com/v1beta';
-  static const String defaultGeminiModel = 'gemini-1.5-flash';
+  static const String defaultGeminiOpenAiBaseUrl =
+      'https://generativelanguage.googleapis.com/v1beta/openai';
+  static const String defaultGeminiModel = 'gemini-3.5-flash';
   static const int defaultGeminiContextTokens = 1048576;
   static const int defaultGeminiMaxResponseTokens = 1000;
+
+  static const String profileOpenaiOfficial = 'official_openai';
+  static const String profileAnthropicOfficial = 'official_anthropic';
+  static const String profileGeminiOfficial = 'official_gemini';
 
   // Storage keys
   static const String keyThemeMode = 'theme_mode';
@@ -33,6 +39,9 @@ class AppConstants {
   static const String keyPrimaryColor = 'primary_color';
   static const String keyUsername = 'username';
   static const String keyDefaultProvider = 'default_provider';
+  static const String keyProviderProfiles = 'provider_profiles';
+  static const String keyDefaultProviderProfileId =
+      'default_provider_profile_id';
   static const String keyOpenaiApiKey = 'openai_api_key';
   static const String keyOpenaiBaseUrl = 'openai_base_url';
   static const String keyOpenaiModel = 'openai_model';

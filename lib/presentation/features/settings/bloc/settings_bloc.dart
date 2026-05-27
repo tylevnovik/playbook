@@ -1,11 +1,12 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../../data/services/api_diagnostics_service.dart';
-import '../../../../domain/repositories/settings_repository.dart';
-import '../../../../domain/entities/llm_config.dart';
-import '../../../../core/constants/app_constants.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
-// Events
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/error/failures.dart';
+import '../../../../data/services/api_diagnostics_service.dart';
+import '../../../../domain/entities/llm_config.dart';
+import '../../../../domain/repositories/settings_repository.dart';
+
 abstract class SettingsEvent extends Equatable {
   @override
   List<Object?> get props => [];
@@ -16,33 +17,67 @@ class LoadSettings extends SettingsEvent {}
 class UpdateStringSetting extends SettingsEvent {
   final String key;
   final String value;
+
   UpdateStringSetting({required this.key, required this.value});
+
   @override
   List<Object?> get props => [key, value];
 }
 
-class UpdateProviderSetting extends SettingsEvent {
-  final LlmProviderType type;
-  UpdateProviderSetting(this.type);
+class SaveProviderProfile extends SettingsEvent {
+  final LlmProviderProfile profile;
+
+  SaveProviderProfile(this.profile);
+
   @override
-  List<Object?> get props => [type];
+  List<Object?> get props => [profile];
+}
+
+class AddProviderProfile extends SettingsEvent {
+  final LlmProviderProfile profile;
+
+  AddProviderProfile(this.profile);
+
+  @override
+  List<Object?> get props => [profile];
+}
+
+class DeleteProviderProfile extends SettingsEvent {
+  final String id;
+
+  DeleteProviderProfile(this.id);
+
+  @override
+  List<Object?> get props => [id];
+}
+
+class SetDefaultProviderProfile extends SettingsEvent {
+  final String id;
+
+  SetDefaultProviderProfile(this.id);
+
+  @override
+  List<Object?> get props => [id];
 }
 
 class TestProviderConnection extends SettingsEvent {
-  final LlmProviderType type;
-  TestProviderConnection(this.type);
+  final LlmProviderProfile profile;
+
+  TestProviderConnection(this.profile);
+
   @override
-  List<Object?> get props => [type];
+  List<Object?> get props => [profile];
 }
 
 class DiscoverProviderModels extends SettingsEvent {
-  final LlmProviderType type;
-  DiscoverProviderModels(this.type);
+  final LlmProviderProfile profile;
+
+  DiscoverProviderModels(this.profile);
+
   @override
-  List<Object?> get props => [type];
+  List<Object?> get props => [profile];
 }
 
-// States
 abstract class SettingsState extends Equatable {
   @override
   List<Object?> get props => [];
@@ -105,39 +140,57 @@ class ProviderDiagnostics extends Equatable {
 
 class SettingsLoaded extends SettingsState {
   final Map<String, String> values;
-  final LlmProviderType defaultProvider;
-  final Map<LlmProviderType, ProviderDiagnostics> diagnostics;
+  final List<LlmProviderProfile> providerProfiles;
+  final String defaultProviderProfileId;
+  final Map<String, ProviderDiagnostics> diagnostics;
 
   SettingsLoaded({
     required this.values,
-    required this.defaultProvider,
+    required this.providerProfiles,
+    required this.defaultProviderProfileId,
     this.diagnostics = const {},
   });
 
+  LlmProviderProfile get defaultProviderProfile {
+    return providerProfiles.firstWhere(
+      (profile) => profile.id == defaultProviderProfileId,
+      orElse: () => providerProfiles.first,
+    );
+  }
+
   SettingsLoaded copyWith({
     Map<String, String>? values,
-    LlmProviderType? defaultProvider,
-    Map<LlmProviderType, ProviderDiagnostics>? diagnostics,
+    List<LlmProviderProfile>? providerProfiles,
+    String? defaultProviderProfileId,
+    Map<String, ProviderDiagnostics>? diagnostics,
   }) {
     return SettingsLoaded(
       values: values ?? this.values,
-      defaultProvider: defaultProvider ?? this.defaultProvider,
+      providerProfiles: providerProfiles ?? this.providerProfiles,
+      defaultProviderProfileId:
+          defaultProviderProfileId ?? this.defaultProviderProfileId,
       diagnostics: diagnostics ?? this.diagnostics,
     );
   }
 
   @override
-  List<Object?> get props => [values, defaultProvider, diagnostics];
+  List<Object?> get props => [
+    values,
+    providerProfiles,
+    defaultProviderProfileId,
+    diagnostics,
+  ];
 }
 
 class SettingsError extends SettingsState {
   final String message;
+
   SettingsError(this.message);
+
   @override
   List<Object?> get props => [message];
 }
 
-// BLoC
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository _repository;
   final ApiDiagnosticsService _diagnosticsService;
@@ -147,7 +200,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       super(SettingsInitial()) {
     on<LoadSettings>(_onLoadSettings);
     on<UpdateStringSetting>(_onUpdateString);
-    on<UpdateProviderSetting>(_onUpdateProvider);
+    on<SaveProviderProfile>(_onSaveProviderProfile);
+    on<AddProviderProfile>(_onAddProviderProfile);
+    on<DeleteProviderProfile>(_onDeleteProviderProfile);
+    on<SetDefaultProviderProfile>(_onSetDefaultProviderProfile);
     on<TestProviderConnection>(_onTestConnection);
     on<DiscoverProviderModels>(_onDiscoverModels);
   }
@@ -158,38 +214,36 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   ) async {
     final previousDiagnostics = state is SettingsLoaded
         ? (state as SettingsLoaded).diagnostics
-        : const <LlmProviderType, ProviderDiagnostics>{};
+        : const <String, ProviderDiagnostics>{};
     emit(SettingsLoading());
-    final keys = [
-      AppConstants.keyThemeMode,
-      AppConstants.keyLanguage,
-      AppConstants.keyUsername,
-      AppConstants.keyOpenaiApiKey,
-      AppConstants.keyOpenaiBaseUrl,
-      AppConstants.keyOpenaiModel,
-      AppConstants.keyAnthropicApiKey,
-      AppConstants.keyAnthropicBaseUrl,
-      AppConstants.keyAnthropicModel,
-      AppConstants.keyGeminiApiKey,
-      AppConstants.keyGeminiBaseUrl,
-      AppConstants.keyGeminiModel,
-    ];
 
-    final Map<String, String> values = {};
-    for (final key in keys) {
-      final res = await _repository.getString(key);
-      res.fold((failure) => null, (val) => values[key] = val ?? '');
+    final valuesResult = await _loadValues();
+    final profilesResult = await _repository.getProviderProfiles();
+    final defaultIdResult = await _repository.getDefaultProviderProfileId();
+
+    final failure =
+        valuesResult.$1 ??
+        profilesResult.fold((f) => f, (_) => null) ??
+        defaultIdResult.fold((f) => f, (_) => null);
+    if (failure != null) {
+      emit(SettingsError(failure.message));
+      return;
     }
 
-    final providerRes = await _repository.getDefaultProvider();
-    providerRes.fold(
-      (failure) => emit(SettingsError(failure.message)),
-      (provider) => emit(
-        SettingsLoaded(
-          values: values,
-          defaultProvider: provider,
-          diagnostics: previousDiagnostics,
-        ),
+    final values = valuesResult.$2;
+    final profiles = profilesResult.getOrElse(() => const []);
+    final defaultId = defaultIdResult.getOrElse(
+      () => profiles.isNotEmpty
+          ? profiles.first.id
+          : AppConstants.profileOpenaiOfficial,
+    );
+
+    emit(
+      SettingsLoaded(
+        values: values,
+        providerProfiles: profiles,
+        defaultProviderProfileId: defaultId,
+        diagnostics: previousDiagnostics,
       ),
     );
   }
@@ -198,19 +252,102 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     UpdateStringSetting event,
     Emitter<SettingsState> emit,
   ) async {
-    await _repository.setString(event.key, event.value);
-    add(LoadSettings());
+    final result = await _repository.setString(event.key, event.value);
+    result.fold((failure) => emit(SettingsError(failure.message)), (_) {
+      final current = state;
+      if (current is SettingsLoaded) {
+        final values = Map<String, String>.from(current.values)
+          ..[event.key] = event.value;
+        emit(current.copyWith(values: values));
+      } else {
+        add(LoadSettings());
+      }
+    });
   }
 
-  Future<void> _onUpdateProvider(
-    UpdateProviderSetting event,
+  Future<void> _onSaveProviderProfile(
+    SaveProviderProfile event,
     Emitter<SettingsState> emit,
   ) async {
-    await _repository.setString(
-      AppConstants.keyDefaultProvider,
-      event.type.name,
+    final current = state;
+    if (current is! SettingsLoaded) return;
+
+    final profiles = current.providerProfiles.map((profile) {
+      return profile.id == event.profile.id ? event.profile : profile;
+    }).toList();
+
+    final result = await _repository.saveProviderProfiles(profiles);
+    result.fold((failure) => emit(SettingsError(failure.message)), (_) {
+      emit(current.copyWith(providerProfiles: profiles));
+    });
+  }
+
+  Future<void> _onAddProviderProfile(
+    AddProviderProfile event,
+    Emitter<SettingsState> emit,
+  ) async {
+    final current = state;
+    if (current is! SettingsLoaded) return;
+
+    final profiles = [...current.providerProfiles, event.profile];
+    final result = await _repository.saveProviderProfiles(profiles);
+    result.fold((failure) => emit(SettingsError(failure.message)), (_) {
+      emit(current.copyWith(providerProfiles: profiles));
+    });
+  }
+
+  Future<void> _onDeleteProviderProfile(
+    DeleteProviderProfile event,
+    Emitter<SettingsState> emit,
+  ) async {
+    final current = state;
+    if (current is! SettingsLoaded) return;
+    final target = current.providerProfiles
+        .where((profile) => profile.id == event.id)
+        .firstOrNull;
+    if (target == null || target.isBuiltIn) return;
+
+    final profiles = current.providerProfiles
+        .where((profile) => profile.id != event.id)
+        .toList();
+    final nextDefaultId = current.defaultProviderProfileId == event.id
+        ? profiles.first.id
+        : current.defaultProviderProfileId;
+    final saveResult = await _repository.saveProviderProfiles(profiles);
+    final defaultResult = await _repository.setDefaultProviderProfileId(
+      nextDefaultId,
     );
-    add(LoadSettings());
+
+    final failure =
+        saveResult.fold((f) => f, (_) => null) ??
+        defaultResult.fold((f) => f, (_) => null);
+    if (failure != null) {
+      emit(SettingsError(failure.message));
+      return;
+    }
+
+    emit(
+      current.copyWith(
+        providerProfiles: profiles,
+        defaultProviderProfileId: nextDefaultId,
+      ),
+    );
+  }
+
+  Future<void> _onSetDefaultProviderProfile(
+    SetDefaultProviderProfile event,
+    Emitter<SettingsState> emit,
+  ) async {
+    final current = state;
+    if (current is! SettingsLoaded) return;
+    if (!current.providerProfiles.any((profile) => profile.id == event.id)) {
+      return;
+    }
+
+    final result = await _repository.setDefaultProviderProfileId(event.id);
+    result.fold((failure) => emit(SettingsError(failure.message)), (_) {
+      emit(current.copyWith(defaultProviderProfileId: event.id));
+    });
   }
 
   Future<void> _onTestConnection(
@@ -224,18 +361,17 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       current.copyWith(
         diagnostics: _updateDiagnostics(
           current,
-          event.type,
+          event.profile.id,
           (existing) => existing.copyWith(isTesting: true),
         ),
       ),
     );
 
-    final snapshot = _providerSnapshot(current.values, event.type);
     final result = await _diagnosticsService.testConnection(
-      providerType: event.type,
-      apiKey: snapshot.apiKey,
-      baseUrl: snapshot.baseUrl,
-      model: snapshot.model,
+      providerType: event.profile.providerType,
+      apiKey: event.profile.apiKey,
+      baseUrl: event.profile.baseUrl,
+      model: event.profile.model,
     );
 
     final latest = state;
@@ -244,7 +380,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       latest.copyWith(
         diagnostics: _updateDiagnostics(
           latest,
-          event.type,
+          event.profile.id,
           (existing) => existing.copyWith(
             isTesting: false,
             connectionOk: result.success,
@@ -266,17 +402,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       current.copyWith(
         diagnostics: _updateDiagnostics(
           current,
-          event.type,
+          event.profile.id,
           (existing) => existing.copyWith(isDiscovering: true),
         ),
       ),
     );
 
-    final snapshot = _providerSnapshot(current.values, event.type);
     final result = await _diagnosticsService.discoverModels(
-      providerType: event.type,
-      apiKey: snapshot.apiKey,
-      baseUrl: snapshot.baseUrl,
+      providerType: event.profile.providerType,
+      apiKey: event.profile.apiKey,
+      baseUrl: event.profile.baseUrl,
     );
 
     final latest = state;
@@ -285,7 +420,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       latest.copyWith(
         diagnostics: _updateDiagnostics(
           latest,
-          event.type,
+          event.profile.id,
           (existing) => existing.copyWith(
             isDiscovering: false,
             discoveryOk: result.success,
@@ -297,73 +432,40 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     );
   }
 
-  Map<LlmProviderType, ProviderDiagnostics> _updateDiagnostics(
+  Future<(Failure?, Map<String, String>)> _loadValues() async {
+    final keys = [
+      AppConstants.keyThemeMode,
+      AppConstants.keyLanguage,
+      AppConstants.keyUsername,
+    ];
+
+    final values = <String, String>{};
+    for (final key in keys) {
+      final res = await _repository.getString(key);
+      final failure = res.fold((failure) => failure, (_) => null);
+      if (failure != null) return (failure, values);
+      values[key] = res.getOrElse(() => '') ?? '';
+    }
+    return (null, values);
+  }
+
+  Map<String, ProviderDiagnostics> _updateDiagnostics(
     SettingsLoaded state,
-    LlmProviderType type,
+    String profileId,
     ProviderDiagnostics Function(ProviderDiagnostics existing) update,
   ) {
-    final updated = Map<LlmProviderType, ProviderDiagnostics>.from(
-      state.diagnostics,
+    final updated = Map<String, ProviderDiagnostics>.from(state.diagnostics);
+    updated[profileId] = update(
+      updated[profileId] ?? const ProviderDiagnostics(),
     );
-    updated[type] = update(updated[type] ?? const ProviderDiagnostics());
     return updated;
-  }
-
-  _ProviderSnapshot _providerSnapshot(
-    Map<String, String> values,
-    LlmProviderType type,
-  ) {
-    return switch (type) {
-      LlmProviderType.openai => _ProviderSnapshot(
-        apiKey: values[AppConstants.keyOpenaiApiKey] ?? '',
-        baseUrl: _valueOrDefault(
-          values[AppConstants.keyOpenaiBaseUrl],
-          AppConstants.defaultOpenaiBaseUrl,
-        ),
-        model: _valueOrDefault(
-          values[AppConstants.keyOpenaiModel],
-          AppConstants.defaultOpenaiModel,
-        ),
-      ),
-      LlmProviderType.anthropic => _ProviderSnapshot(
-        apiKey: values[AppConstants.keyAnthropicApiKey] ?? '',
-        baseUrl: _valueOrDefault(
-          values[AppConstants.keyAnthropicBaseUrl],
-          AppConstants.defaultAnthropicBaseUrl,
-        ),
-        model: _valueOrDefault(
-          values[AppConstants.keyAnthropicModel],
-          AppConstants.defaultAnthropicModel,
-        ),
-      ),
-      LlmProviderType.gemini => _ProviderSnapshot(
-        apiKey: values[AppConstants.keyGeminiApiKey] ?? '',
-        baseUrl: _valueOrDefault(
-          values[AppConstants.keyGeminiBaseUrl],
-          AppConstants.defaultGeminiBaseUrl,
-        ),
-        model: _valueOrDefault(
-          values[AppConstants.keyGeminiModel],
-          AppConstants.defaultGeminiModel,
-        ),
-      ),
-    };
-  }
-
-  String _valueOrDefault(String? value, String fallback) {
-    if (value == null || value.trim().isEmpty) return fallback;
-    return value.trim();
   }
 }
 
-class _ProviderSnapshot {
-  final String apiKey;
-  final String baseUrl;
-  final String model;
-
-  const _ProviderSnapshot({
-    required this.apiKey,
-    required this.baseUrl,
-    required this.model,
-  });
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull {
+    final iterator = this.iterator;
+    if (iterator.moveNext()) return iterator.current;
+    return null;
+  }
 }

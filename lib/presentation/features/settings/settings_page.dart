@@ -235,20 +235,26 @@ class SettingsPage extends StatelessWidget {
       padding: const EdgeInsets.all(16.0),
       children: [
         ApiConfigSection(
-          values: state.values,
-          defaultProvider: state.defaultProvider,
+          providerProfiles: state.providerProfiles,
+          defaultProviderProfileId: state.defaultProviderProfileId,
           diagnostics: state.diagnostics,
-          onUpdateSetting: (key, val) {
-            bloc.add(UpdateStringSetting(key: key, value: val));
+          onSaveProvider: (profile) {
+            bloc.add(SaveProviderProfile(profile));
           },
-          onUpdateProvider: (providerType) {
-            bloc.add(UpdateProviderSetting(providerType));
+          onAddProvider: (profile) {
+            bloc.add(AddProviderProfile(profile));
           },
-          onTestProvider: (providerType) {
-            bloc.add(TestProviderConnection(providerType));
+          onDeleteProvider: (id) {
+            bloc.add(DeleteProviderProfile(id));
           },
-          onDiscoverModels: (providerType) {
-            bloc.add(DiscoverProviderModels(providerType));
+          onSetDefaultProvider: (id) {
+            bloc.add(SetDefaultProviderProfile(id));
+          },
+          onTestProvider: (profile) {
+            bloc.add(TestProviderConnection(profile));
+          },
+          onDiscoverModels: (profile) {
+            bloc.add(DiscoverProviderModels(profile));
           },
         ),
         const SizedBox(height: 16),
