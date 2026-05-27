@@ -1,14 +1,357 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../domain/entities/character.dart';
+import '../../../../domain/entities/world_book.dart';
+import '../../../../domain/repositories/character_repository.dart';
+import '../../../../domain/repositories/world_book_repository.dart';
+import 'bloc/character_edit_bloc.dart';
 
-class CharacterEditPage extends StatelessWidget {
+class CharacterEditPage extends StatefulWidget {
   final String? characterId;
 
   const CharacterEditPage({super.key, this.characterId});
 
   @override
+  State<CharacterEditPage> createState() => _CharacterEditPageState();
+}
+
+class _CharacterEditPageState extends State<CharacterEditPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descController = TextEditingController();
+  final _greetingController = TextEditingController();
+  final _exampleController = TextEditingController();
+  final _promptController = TextEditingController();
+  final _tagController = TextEditingController();
+
+  String? _avatarPath;
+  String? _selectedWorldBookId;
+  List<String> _tags = [];
+  List<WorldBook> _worldBooks = [];
+  bool _isLoadingWorldBooks = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorldBooks();
+  }
+
+  Future<void> _loadWorldBooks() async {
+    final result = await getIt<WorldBookRepository>().getAllWorldBooks();
+    result.fold(
+      (failure) => null,
+      (books) {
+        if (mounted) {
+          setState(() {
+            _worldBooks = books;
+            _isLoadingWorldBooks = false;
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    _greetingController.dispose();
+    _exampleController.dispose();
+    _promptController.dispose();
+    _tagController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        _avatarPath = image.path;
+      });
+    }
+  }
+
+  void _addTag(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isNotEmpty && !_tags.contains(trimmed)) {
+      setState(() {
+        _tags.add(trimmed);
+        _tagController.clear();
+      });
+    }
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _tags.remove(tag);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(child: Text('Character Edit Page: $characterId')),
+    return BlocProvider(
+      create: (context) {
+        final bloc = CharacterEditBloc(getIt<CharacterRepository>());
+        if (widget.characterId != null) {
+          bloc.add(LoadCharacterForEdit(widget.characterId!));
+        }
+        return bloc;
+      },
+      child: BlocConsumer<CharacterEditBloc, CharacterEditState>(
+        listener: (context, state) {
+          if (state is CharacterEditSaved) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Character saved successfully!')),
+            );
+            context.pop();
+          }
+          if (state is CharacterEditError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message)),
+            );
+          }
+          if (state is CharacterEditLoaded && state.character != null) {
+            final char = state.character!;
+            _nameController.text = char.name;
+            _descController.text = char.description;
+            _greetingController.text = char.greeting;
+            _exampleController.text = char.exampleMessages ?? '';
+            _promptController.text = char.systemPrompt ?? '';
+            _avatarPath = char.avatarPath;
+            _selectedWorldBookId = char.worldBookId;
+            _tags = List.from(char.tags);
+          }
+        },
+        builder: (context, state) {
+          final isSaving = state is CharacterEditLoading;
+
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(widget.characterId == null ? 'Create Character' : 'Edit Character'),
+              actions: [
+                if (widget.characterId != null)
+                  IconButton(
+                    icon: const Icon(Icons.share),
+                    tooltip: 'Export Character',
+                    onPressed: () => _exportJson(context),
+                  ),
+              ],
+            ),
+            body: isSaving
+                ? const Center(child: CircularProgressIndicator())
+                : Form(
+                    key: _formKey,
+                    child: ListView(
+                      padding: const EdgeInsets.all(16.0),
+                      children: [
+                        // Avatar picker
+                        Center(
+                          child: GestureDetector(
+                            onTap: _pickAvatar,
+                            child: CircleAvatar(
+                              radius: 50,
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                              backgroundImage: _avatarPath != null ? NetworkImage(_avatarPath!) : null,
+                              child: _avatarPath == null
+                                  ? Icon(
+                                      Icons.camera_alt,
+                                      size: 32,
+                                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Center(child: Text('Tap to change avatar', style: TextStyle(fontSize: 12))),
+                        const SizedBox(height: 16),
+
+                        // Name field
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Character Name *',
+                            hintText: 'e.g. Albert Einstein',
+                          ),
+                          validator: (val) => val == null || val.trim().isEmpty ? 'Name is required' : null,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Description field
+                        TextFormField(
+                          controller: _descController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Description / Character Persona *',
+                            hintText: 'Describe the personality, background, and quirks of the character.',
+                          ),
+                          validator: (val) => val == null || val.trim().isEmpty ? 'Description is required' : null,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Greeting field
+                        TextFormField(
+                          controller: _greetingController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Greeting Message *',
+                            hintText: 'First message the character sends when starting a new chat.',
+                          ),
+                          validator: (val) => val == null || val.trim().isEmpty ? 'Greeting is required' : null,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // System prompt override
+                        TextFormField(
+                          controller: _promptController,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            labelText: 'System Prompt Override',
+                            hintText: 'Custom instructions (e.g. "Speak in Shakespearean English.")',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Example messages
+                        TextFormField(
+                          controller: _exampleController,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            labelText: 'Example Messages',
+                            hintText: '<user>: Hello!\n<char>: Greetings, my friend! How can I assist you today?',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // World Book dropdown
+                        _isLoadingWorldBooks
+                            ? const Center(child: CircularProgressIndicator())
+                            : DropdownButtonFormField<String>(
+                                value: _selectedWorldBookId,
+                                decoration: const InputDecoration(
+                                  labelText: 'World Book',
+                                  hintText: 'Select a World Book to link',
+                                ),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('None'),
+                                  ),
+                                  ..._worldBooks.map((book) => DropdownMenuItem<String>(
+                                        value: book.id,
+                                        child: Text(book.name),
+                                      )),
+                                ],
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedWorldBookId = val;
+                                  });
+                                },
+                              ),
+                        const SizedBox(height: 16),
+
+                        // Tags
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _tagController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Add Tag',
+                                  hintText: 'e.g. historical, sci-fi',
+                                ),
+                                onFieldSubmitted: _addTag,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              icon: const Icon(Icons.add),
+                              onPressed: () => _addTag(_tagController.text),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8.0,
+                          runSpacing: 4.0,
+                          children: _tags
+                              .map((t) => Chip(
+                                    label: Text(t),
+                                    onDeleted: () => _removeTag(t),
+                                  ))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Buttons
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => context.pop(),
+                              child: const Text('Cancel'),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                if (_formKey.currentState!.validate()) {
+                                  final char = Character(
+                                    id: widget.characterId ?? '',
+                                    name: _nameController.text.trim(),
+                                    avatarPath: _avatarPath,
+                                    description: _descController.text.trim(),
+                                    greeting: _greetingController.text.trim(),
+                                    exampleMessages: _exampleController.text.trim().isEmpty ? null : _exampleController.text.trim(),
+                                    systemPrompt: _promptController.text.trim().isEmpty ? null : _promptController.text.trim(),
+                                    tags: _tags,
+                                    worldBookId: _selectedWorldBookId,
+                                    createdAt: DateTime.now(),
+                                    updatedAt: DateTime.now(),
+                                  );
+                                  context.read<CharacterEditBloc>().add(SaveCharacter(char));
+                                }
+                              },
+                              child: const Text('Save'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _exportJson(BuildContext context) async {
+    final result = await getIt<CharacterRepository>().exportCharacter(widget.characterId!);
+    result.fold(
+      (failure) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to export character: ${failure.message}')),
+      ),
+      (jsonStr) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Exported Character JSON'),
+            content: SingleChildScrollView(
+              child: SelectableText(jsonStr),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
