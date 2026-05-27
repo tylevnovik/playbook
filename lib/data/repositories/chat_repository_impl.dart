@@ -16,6 +16,37 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this._chatDao, this._messageDao);
 
   @override
+  Future<Either<Failure, Chat>> getChat(String id) async {
+    try {
+      final map = await _chatDao.getById(id);
+      if (map == null) return const Left(DatabaseFailure('Chat not found'));
+      return Right(ChatModel.fromMap(map));
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> updateChat(Chat chat) async {
+    try {
+      await _chatDao.update(chat.id, ChatModel.toMap(chat));
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<Chat>>> getAllChats() async {
+    try {
+      final maps = await _chatDao.getAll();
+      return Right(maps.map(ChatModel.fromMap).toList());
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<Chat>>> getChatsForCharacter(String characterId) async {
     try {
       final maps = await _chatDao.getByCharacterId(characterId);
@@ -26,12 +57,16 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<Either<Failure, Chat>> createChat(String characterId) async {
+  Future<Either<Failure, Chat>> createChat({
+    required List<String> characterIds,
+    List<String> worldBookIds = const [],
+  }) async {
     try {
       final now = DateTime.now();
       final chat = Chat(
         id: IdGenerator.generate(),
-        characterId: characterId,
+        characterIds: characterIds,
+        worldBookIds: worldBookIds,
         createdAt: now,
         updatedAt: now,
       );
@@ -89,7 +124,8 @@ class ChatRepositoryImpl implements ChatRepository {
         final chat = ChatModel.fromMap(chatMap);
         final updatedChat = Chat(
           id: chat.id,
-          characterId: chat.characterId,
+          characterIds: chat.characterIds,
+          worldBookIds: chat.worldBookIds,
           createdAt: chat.createdAt,
           updatedAt: DateTime.now(),
         );

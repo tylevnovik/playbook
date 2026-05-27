@@ -9,8 +9,14 @@ class ManageChat {
 
   ManageChat({required this.repository});
 
-  Future<Either<Failure, Chat>> createChat(String characterId) {
-    return repository.createChat(characterId);
+  Future<Either<Failure, Chat>> createChat({
+    required List<String> characterIds,
+    List<String> worldBookIds = const [],
+  }) {
+    return repository.createChat(
+      characterIds: characterIds,
+      worldBookIds: worldBookIds,
+    );
   }
 
   Future<Either<Failure, void>> deleteChat(String id) {

@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/constants/app_constants.dart';
 import 'domain/repositories/character_repository.dart';
+import 'domain/repositories/chat_repository.dart';
 import 'domain/repositories/settings_repository.dart';
 import 'presentation/features/home/bloc/home_bloc.dart';
 import 'presentation/features/settings/bloc/settings_bloc.dart';
@@ -21,7 +22,7 @@ class PlaybookApp extends StatelessWidget {
       providers: [
         BlocProvider(
           create: (_) =>
-              HomeBloc(getIt<CharacterRepository>())..add(LoadCharacters()),
+              HomeBloc(getIt<CharacterRepository>(), getIt<ChatRepository>())..add(LoadCharacters()),
         ),
         BlocProvider(
           create: (_) =>

@@ -9,7 +9,7 @@ class Character extends Equatable {
   final String? exampleMessages;
   final String? systemPrompt;
   final List<String> tags;
-  final String? worldBookId;
+  final List<String> worldBookIds;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastChattedAt;
@@ -23,7 +23,7 @@ class Character extends Equatable {
     this.exampleMessages,
     this.systemPrompt,
     this.tags = const [],
-    this.worldBookId,
+    this.worldBookIds = const [],
     required this.createdAt,
     required this.updatedAt,
     this.lastChattedAt,
@@ -37,7 +37,7 @@ class Character extends Equatable {
     String? exampleMessages,
     String? systemPrompt,
     List<String>? tags,
-    String? worldBookId,
+    List<String>? worldBookIds,
     DateTime? lastChattedAt,
   }) {
     return Character(
@@ -49,7 +49,7 @@ class Character extends Equatable {
       exampleMessages: exampleMessages ?? this.exampleMessages,
       systemPrompt: systemPrompt ?? this.systemPrompt,
       tags: tags ?? this.tags,
-      worldBookId: worldBookId ?? this.worldBookId,
+      worldBookIds: worldBookIds ?? this.worldBookIds,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       lastChattedAt: lastChattedAt ?? this.lastChattedAt,

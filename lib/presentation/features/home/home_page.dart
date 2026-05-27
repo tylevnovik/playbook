@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../domain/repositories/character_repository.dart';
+import '../../../domain/repositories/chat_repository.dart';
 import '../../common/widgets/desktop_character_sidebar.dart';
 import '../../common/widgets/responsive_layout.dart';
 import 'bloc/home_bloc.dart';
@@ -157,7 +158,34 @@ class _HomeMobileView extends StatelessWidget {
                 final character = state.characters[index];
                 return CharacterCard(
                   character: character,
-                  onTap: () => context.push('/chat/${character.id}'),
+                  onTap: () async {
+                    final existingChatIndex = state.chats.indexWhere((chat) =>
+                        chat.characterIds.length == 1 &&
+                        chat.characterIds.first == character.id);
+                    if (existingChatIndex != -1) {
+                      final chatId = state.chats[existingChatIndex].id;
+                      if (context.mounted) {
+                        context.push('/chat/$chatId');
+                      }
+                    } else {
+                      final chatResult = await getIt<ChatRepository>().createChat(
+                        characterIds: [character.id],
+                      );
+                      if (context.mounted) {
+                        chatResult.fold(
+                          (failure) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('创建会话失败: ${failure.message}')),
+                            );
+                          },
+                          (newChat) {
+                            context.read<HomeBloc>().add(LoadCharacters());
+                            context.push('/chat/${newChat.id}');
+                          },
+                        );
+                      }
+                    }
+                  },
                   onDelete: () {
                     context.read<HomeBloc>().add(DeleteCharacter(character.id));
                   },

@@ -18,6 +18,7 @@ class Message extends Equatable {
   final List<MessageAttachment>? attachments;
   final int? tokensUsed;
   final DateTime createdAt;
+  final String? senderId;
 
   const Message({
     required this.id,
@@ -28,8 +29,9 @@ class Message extends Equatable {
     this.attachments,
     this.tokensUsed,
     required this.createdAt,
+    this.senderId,
   });
 
   @override
-  List<Object?> get props => [id, chatId, parentId, role, content];
+  List<Object?> get props => [id, chatId, parentId, role, content, senderId];
 }

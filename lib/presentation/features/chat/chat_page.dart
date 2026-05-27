@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../domain/entities/message.dart';
@@ -17,10 +18,9 @@ import 'widgets/chat_input.dart';
 import 'widgets/chat_drawer.dart';
 
 class ChatPage extends StatefulWidget {
-  final String characterId;
-  final String? chatId;
+  final String chatId;
 
-  const ChatPage({super.key, required this.characterId, this.chatId});
+  const ChatPage({super.key, required this.chatId});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -57,7 +57,7 @@ class _ChatPageState extends State<ChatPage> {
         loadCharacter: getIt<LoadCharacter>(),
         manageChat: getIt<ManageChat>(),
         sendMessage: getIt<SendMessage>(),
-      )..add(LoadChat(characterId: widget.characterId, chatId: widget.chatId)),
+      )..add(LoadChat(chatId: widget.chatId)),
       child: BlocConsumer<ChatBloc, ChatState>(
         listener: (context, state) {
           if (state is ChatLoaded) {
@@ -72,7 +72,6 @@ class _ChatPageState extends State<ChatPage> {
               onRetry: () {
                 context.read<ChatBloc>().add(
                   LoadChat(
-                    characterId: widget.characterId,
                     chatId: widget.chatId,
                   ),
                 );
@@ -114,22 +113,25 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     if (state is ChatLoaded) {
-      final character = state.character;
+      final activeCharId = state.activeCharacterId;
+      final activeChar = state.characters.firstWhereOrNull((c) => c.id == activeCharId) ??
+          (state.characters.isNotEmpty ? state.characters.first : null);
       final messages = state.messages;
 
       return Scaffold(
         appBar: AppBar(
           title: Row(
             children: [
-              if (character.avatarPath != null &&
-                  character.avatarPath!.isNotEmpty) ...[
+              if (activeChar != null &&
+                  activeChar.avatarPath != null &&
+                  activeChar.avatarPath!.isNotEmpty) ...[
                 CircleAvatar(
-                  backgroundImage: NetworkImage(character.avatarPath!),
+                  backgroundImage: NetworkImage(activeChar.avatarPath!),
                   radius: 18,
                 ),
                 const SizedBox(width: 8),
               ],
-              Text(character.name),
+              Text(activeChar?.name ?? 'Chats'),
             ],
           ),
           actions: [
@@ -145,13 +147,23 @@ class _ChatPageState extends State<ChatPage> {
         endDrawer: ChatDrawer(
           initialTemperature: _temperature,
           initialMaxTokens: _maxTokens,
-          initialSystemPrompt: _systemPromptOverride ?? character.systemPrompt,
+          initialSystemPrompt: _systemPromptOverride ?? activeChar?.systemPrompt,
           onSettingsChanged: (temp, maxT, prompt) {
             setState(() {
               _temperature = temp;
               _maxTokens = maxT;
               _systemPromptOverride = prompt;
             });
+          },
+          selectedCharacterIds: state.chat.characterIds,
+          allAvailableCharacters: state.allAvailableCharacters,
+          onCharactersChanged: (newIds) {
+            context.read<ChatBloc>().add(UpdateChatCharacters(newIds));
+          },
+          selectedWorldBookIds: state.chat.worldBookIds,
+          allAvailableWorldBooks: state.allAvailableWorldBooks,
+          onWorldBooksChanged: (newIds) {
+            context.read<ChatBloc>().add(UpdateChatWorldBooks(newIds));
           },
         ),
         body: Column(
@@ -184,10 +196,15 @@ class _ChatPageState extends State<ChatPage> {
                           if (currentBranchIndex == -1) currentBranchIndex = 0;
                         }
 
+                        final senderChar = state.characters.firstWhereOrNull((c) => c.id == msg.senderId) ??
+                            (state.characters.isNotEmpty ? state.characters.first : null);
+                        final charName = senderChar?.name ?? 'Assistant';
+                        final charAvatar = senderChar?.avatarPath;
+
                         return ChatBubble(
                           message: msg,
-                          characterName: character.name,
-                          characterAvatar: character.avatarPath,
+                          characterName: charName,
+                          characterAvatar: charAvatar,
                           branchCount: branchCount,
                           currentBranchIndex: currentBranchIndex,
                           onPreviousBranch: () {
@@ -204,6 +221,7 @@ class _ChatPageState extends State<ChatPage> {
                       },
                     ),
             ),
+            if (state.characters.length > 1) _buildCharacterSwitcher(context, state),
             ChatInput(
               isSending: state is ChatLoading,
               onSend: (text, attachments) {
@@ -238,7 +256,7 @@ class _ChatPageState extends State<ChatPage> {
     if (state is ChatLoading) {
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedCharacterId: widget.characterId),
+          DesktopCharacterSidebar(selectedChatId: widget.chatId),
           const Expanded(child: Center(child: CircularProgressIndicator())),
         ],
       );
@@ -247,7 +265,7 @@ class _ChatPageState extends State<ChatPage> {
     if (state is ChatError) {
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedCharacterId: widget.characterId),
+          DesktopCharacterSidebar(selectedChatId: widget.chatId),
           Expanded(
             child: Scaffold(
               appBar: AppBar(title: Text(loc.get('error'))),
@@ -267,26 +285,29 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     if (state is ChatLoaded) {
-      final character = state.character;
+      final activeCharId = state.activeCharacterId;
+      final activeChar = state.characters.firstWhereOrNull((c) => c.id == activeCharId) ??
+          (state.characters.isNotEmpty ? state.characters.first : null);
       final messages = state.messages;
 
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedCharacterId: widget.characterId),
+          DesktopCharacterSidebar(selectedChatId: widget.chatId),
           Expanded(
             child: Scaffold(
               appBar: AppBar(
                 title: Row(
                   children: [
-                    if (character.avatarPath != null &&
-                        character.avatarPath!.isNotEmpty) ...[
+                    if (activeChar != null &&
+                        activeChar.avatarPath != null &&
+                        activeChar.avatarPath!.isNotEmpty) ...[
                       CircleAvatar(
-                        backgroundImage: NetworkImage(character.avatarPath!),
+                        backgroundImage: NetworkImage(activeChar.avatarPath!),
                         radius: 18,
                       ),
                       const SizedBox(width: 8),
                     ],
-                    Text(character.name),
+                    Text(activeChar?.name ?? 'Chats'),
                   ],
                 ),
                 actions: [
@@ -303,13 +324,23 @@ class _ChatPageState extends State<ChatPage> {
                 initialTemperature: _temperature,
                 initialMaxTokens: _maxTokens,
                 initialSystemPrompt:
-                    _systemPromptOverride ?? character.systemPrompt,
+                    _systemPromptOverride ?? activeChar?.systemPrompt,
                 onSettingsChanged: (temp, maxT, prompt) {
                   setState(() {
                     _temperature = temp;
                     _maxTokens = maxT;
                     _systemPromptOverride = prompt;
                   });
+                },
+                selectedCharacterIds: state.chat.characterIds,
+                allAvailableCharacters: state.allAvailableCharacters,
+                onCharactersChanged: (newIds) {
+                  context.read<ChatBloc>().add(UpdateChatCharacters(newIds));
+                },
+                selectedWorldBookIds: state.chat.worldBookIds,
+                allAvailableWorldBooks: state.allAvailableWorldBooks,
+                onWorldBooksChanged: (newIds) {
+                  context.read<ChatBloc>().add(UpdateChatWorldBooks(newIds));
                 },
               ),
               body: Column(
@@ -344,10 +375,15 @@ class _ChatPageState extends State<ChatPage> {
                                 }
                               }
 
+                              final senderChar = state.characters.firstWhereOrNull((c) => c.id == msg.senderId) ??
+                                  (state.characters.isNotEmpty ? state.characters.first : null);
+                              final charName = senderChar?.name ?? 'Assistant';
+                              final charAvatar = senderChar?.avatarPath;
+
                               return ChatBubble(
                                 message: msg,
-                                characterName: character.name,
-                                characterAvatar: character.avatarPath,
+                                characterName: charName,
+                                characterAvatar: charAvatar,
                                 branchCount: branchCount,
                                 currentBranchIndex: currentBranchIndex,
                                 onPreviousBranch: () {
@@ -364,6 +400,7 @@ class _ChatPageState extends State<ChatPage> {
                             },
                           ),
                   ),
+                  if (state.characters.length > 1) _buildCharacterSwitcher(context, state),
                   ChatInput(
                     isSending: state is ChatLoading,
                     onSend: (text, attachments) {
@@ -395,9 +432,52 @@ class _ChatPageState extends State<ChatPage> {
 
     return Row(
       children: [
-        DesktopCharacterSidebar(selectedCharacterId: widget.characterId),
+        DesktopCharacterSidebar(selectedChatId: widget.chatId),
         Expanded(child: Center(child: Text(loc.get('loading')))),
       ],
+    );
+  }
+
+  Widget _buildCharacterSwitcher(BuildContext context, ChatLoaded state) {
+    final theme = Theme.of(context);
+    final activeCharId = state.activeCharacterId;
+
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        children: state.characters.map((char) {
+          final isSelected = char.id == activeCharId;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              avatar: CircleAvatar(
+                backgroundImage: char.avatarPath != null && char.avatarPath!.isNotEmpty
+                    ? NetworkImage(char.avatarPath!)
+                    : null,
+                child: char.avatarPath == null || char.avatarPath!.isEmpty
+                    ? Text(char.name.isNotEmpty ? char.name[0].toUpperCase() : '?')
+                    : null,
+              ),
+              label: Text(char.name),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (selected) {
+                  context.read<ChatBloc>().add(SetActiveCharacter(char.id));
+                }
+              },
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 }

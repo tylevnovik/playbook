@@ -21,6 +21,7 @@ class MessageModel {
       attachments: attachments,
       tokensUsed: map['tokens_used'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
+      senderId: map['sender_id'] as String?,
     );
   }
 
@@ -39,6 +40,7 @@ class MessageModel {
           : null,
       'tokens_used': message.tokensUsed,
       'created_at': message.createdAt.toIso8601String(),
+      'sender_id': message.senderId,
     };
   }
 }

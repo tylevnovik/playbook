@@ -91,6 +91,8 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i952.LlmRepository>(),
         gh<_i972.ChatRepository>(),
         gh<_i706.SettingsRepository>(),
+        gh<_i142.CharacterRepository>(),
+        gh<_i443.BuildPrompt>(),
       ),
     );
     return this;

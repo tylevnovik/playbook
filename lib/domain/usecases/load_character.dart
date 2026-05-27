@@ -14,16 +14,20 @@ class LoadCharacter {
     required this.chatRepository,
   });
 
-  Future<Either<Failure, (Character, List<Chat>)>> call(String characterId) async {
-    final charResult = await characterRepository.getCharacter(characterId);
-    return charResult.fold(
+  Future<Either<Failure, (Chat, List<Character>)>> call(String chatId) async {
+    final chatResult = await chatRepository.getChat(chatId);
+    return await chatResult.fold(
       (failure) => Left(failure),
-      (character) async {
-        final chatsResult = await chatRepository.getChatsForCharacter(characterId);
-        return chatsResult.fold(
-          (failure) => Left(failure),
-          (chats) => Right((character, chats)),
-        );
+      (chat) async {
+        final List<Character> characters = [];
+        for (final charId in chat.characterIds) {
+          final charResult = await characterRepository.getCharacter(charId);
+          charResult.fold(
+            (_) => null,
+            (char) => characters.add(char),
+          );
+        }
+        return Right((chat, characters));
       },
     );
   }

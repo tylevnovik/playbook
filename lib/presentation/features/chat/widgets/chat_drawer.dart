@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
+import '../../../../domain/entities/character.dart';
+import '../../../../domain/entities/world_book.dart';
 
 class ChatDrawer extends StatefulWidget {
   final double initialTemperature;
   final int initialMaxTokens;
   final String? initialSystemPrompt;
   final Function(double, int, String?) onSettingsChanged;
+  
+  final List<String> selectedCharacterIds;
+  final List<Character> allAvailableCharacters;
+  final Function(List<String>) onCharactersChanged;
+
+  final List<String> selectedWorldBookIds;
+  final List<WorldBook> allAvailableWorldBooks;
+  final Function(List<String>) onWorldBooksChanged;
 
   const ChatDrawer({
     super.key,
@@ -12,6 +22,12 @@ class ChatDrawer extends StatefulWidget {
     required this.initialMaxTokens,
     this.initialSystemPrompt,
     required this.onSettingsChanged,
+    required this.selectedCharacterIds,
+    required this.allAvailableCharacters,
+    required this.onCharactersChanged,
+    required this.selectedWorldBookIds,
+    required this.allAvailableWorldBooks,
+    required this.onWorldBooksChanged,
   });
 
   @override
@@ -123,6 +139,80 @@ class _ChatDrawerState extends State<ChatDrawer> {
               ),
               onChanged: (_) => _triggerChanged(),
             ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // Select characters
+            Text(
+              '会话参与角色',
+              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...widget.allAvailableCharacters.map((char) {
+              final isSelected = widget.selectedCharacterIds.contains(char.id);
+              return CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(char.name),
+                value: isSelected,
+                secondary: CircleAvatar(
+                  radius: 16,
+                  backgroundImage: char.avatarPath != null && char.avatarPath!.isNotEmpty
+                      ? NetworkImage(char.avatarPath!)
+                      : null,
+                  child: char.avatarPath == null || char.avatarPath!.isEmpty
+                      ? Text(char.name.isNotEmpty ? char.name[0].toUpperCase() : '?')
+                      : null,
+                ),
+                onChanged: (val) {
+                  final newIds = List<String>.from(widget.selectedCharacterIds);
+                  if (val == true) {
+                    newIds.add(char.id);
+                  } else {
+                    // 确保至少保留一个角色（可选，如果可以空就不限制）
+                    newIds.remove(char.id);
+                  }
+                  widget.onCharactersChanged(newIds);
+                },
+              );
+            }),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // Select world books
+            Text(
+              '会话关联世界书',
+              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            widget.allAvailableWorldBooks.isEmpty
+                ? Text(
+                    '无可用世界书',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  )
+                : Column(
+                    children: widget.allAvailableWorldBooks.map((wb) {
+                      final isSelected = widget.selectedWorldBookIds.contains(wb.id);
+                      return CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(wb.name),
+                        subtitle: wb.description != null && wb.description!.isNotEmpty
+                            ? Text(wb.description!, maxLines: 1, overflow: TextOverflow.ellipsis)
+                            : null,
+                        value: isSelected,
+                        onChanged: (val) {
+                          final newIds = List<String>.from(widget.selectedWorldBookIds);
+                          if (val == true) {
+                            newIds.add(wb.id);
+                          } else {
+                            newIds.remove(wb.id);
+                          }
+                          widget.onWorldBooksChanged(newIds);
+                        },
+                      );
+                    }).toList(),
+                  ),
           ],
         ),
       ),

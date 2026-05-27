@@ -30,7 +30,7 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
   final _tagController = TextEditingController();
 
   String? _avatarPath;
-  String? _selectedWorldBookId;
+  List<String> _selectedWorldBookIds = [];
   List<String> _tags = [];
   List<WorldBook> _worldBooks = [];
   bool _isLoadingWorldBooks = true;
@@ -122,7 +122,7 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
             _exampleController.text = char.exampleMessages ?? '';
             _promptController.text = char.systemPrompt ?? '';
             _avatarPath = char.avatarPath;
-            _selectedWorldBookId = char.worldBookId;
+            _selectedWorldBookIds = List.from(char.worldBookIds);
             _tags = List.from(char.tags);
           }
         },
@@ -249,32 +249,85 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                         ),
                         const SizedBox(height: 16),
 
-                        // World Book dropdown
+                        // World Books
                         _isLoadingWorldBooks
                             ? const Center(child: CircularProgressIndicator())
-                            : DropdownButtonFormField<String>(
-                                initialValue: _selectedWorldBookId,
-                                decoration: InputDecoration(
-                                  labelText: loc.get('worldBook'),
-                                  hintText: loc.get('selectWorldBookToLink'),
-                                ),
-                                items: [
-                                  DropdownMenuItem<String>(
-                                    value: null,
-                                    child: Text(loc.get('none')),
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    loc.get('worldBook'),
+                                    style: Theme.of(context).textTheme.titleSmall,
                                   ),
-                                  ..._worldBooks.map(
-                                    (book) => DropdownMenuItem<String>(
-                                      value: book.id,
-                                      child: Text(book.name),
+                                  const SizedBox(height: 8),
+                                  InkWell(
+                                    onTap: () => _showWorldBookSelectionDialog(context),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Theme.of(context).colorScheme.outlineVariant,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: _selectedWorldBookIds.isEmpty
+                                          ? Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.book_outlined,
+                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  loc.get('selectWorldBookToLink'),
+                                                  style: TextStyle(
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : Wrap(
+                                              spacing: 8.0,
+                                              runSpacing: 4.0,
+                                              crossAxisAlignment: WrapCrossAlignment.center,
+                                              children: [
+                                                ..._selectedWorldBookIds.map((id) {
+                                                  final book = _worldBooks.firstWhere(
+                                                    (b) => b.id == id,
+                                                    orElse: () => WorldBook(
+                                                      id: id,
+                                                      name: '未知世界书',
+                                                      description: '',
+                                                      createdAt: DateTime.now(),
+                                                      updatedAt: DateTime.now(),
+                                                    ),
+                                                  );
+                                                  return Chip(
+                                                    label: Text(book.name),
+                                                    onDeleted: () {
+                                                      setState(() {
+                                                        _selectedWorldBookIds.remove(id);
+                                                      });
+                                                    },
+                                                  );
+                                                }),
+                                                IconButton(
+                                                  icon: const Icon(Icons.add_circle_outline, size: 24),
+                                                  onPressed: () => _showWorldBookSelectionDialog(context),
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(),
+                                                ),
+                                              ],
+                                            ),
                                     ),
                                   ),
                                 ],
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedWorldBookId = val;
-                                  });
-                                },
                               ),
                         const SizedBox(height: 16),
 
@@ -340,7 +393,7 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
                                         ? null
                                         : _promptController.text.trim(),
                                     tags: _tags,
-                                    worldBookId: _selectedWorldBookId,
+                                    worldBookIds: _selectedWorldBookIds,
                                     createdAt: DateTime.now(),
                                     updatedAt: DateTime.now(),
                                   );
@@ -359,6 +412,59 @@ class _CharacterEditPageState extends State<CharacterEditPage> {
           );
         },
       ),
+    );
+  }
+
+  void _showWorldBookSelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final loc = AppLocalizations.of(context)!;
+            return AlertDialog(
+              title: Text(loc.get('selectWorldBooks')),
+              content: _worldBooks.isEmpty
+                  ? Text(loc.get('noWorldBooksAvailable'))
+                  : SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _worldBooks.map((book) {
+                          final isSelected = _selectedWorldBookIds.contains(book.id);
+                          return CheckboxListTile(
+                            title: Text(book.name),
+                            subtitle: (book.description != null && book.description!.isNotEmpty)
+                                ? Text(
+                                    book.description!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  )
+                                : null,
+                            value: isSelected,
+                            onChanged: (checked) {
+                              setDialogState(() {
+                                if (checked == true) {
+                                  _selectedWorldBookIds.add(book.id);
+                                } else {
+                                  _selectedWorldBookIds.remove(book.id);
+                                }
+                              });
+                              setState(() {});
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(loc.get('ok')),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 

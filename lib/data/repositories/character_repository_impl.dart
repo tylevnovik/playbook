@@ -49,7 +49,7 @@ class CharacterRepositoryImpl implements CharacterRepository {
         exampleMessages: character.exampleMessages,
         systemPrompt: character.systemPrompt,
         tags: character.tags,
-        worldBookId: character.worldBookId,
+        worldBookIds: character.worldBookIds,
         createdAt: now,
         updatedAt: now,
       );
@@ -108,7 +108,7 @@ class CharacterRepositoryImpl implements CharacterRepository {
         exampleMessages: source.exampleMessages,
         systemPrompt: source.systemPrompt,
         tags: source.tags,
-        worldBookId: source.worldBookId,
+        worldBookIds: source.worldBookIds,
         createdAt: now,
         updatedAt: now,
         lastChattedAt: null,

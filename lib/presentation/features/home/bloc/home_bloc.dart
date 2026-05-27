@@ -2,7 +2,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../data/samples/sample_content.dart';
 import '../../../../domain/entities/character.dart';
+import '../../../../domain/entities/chat.dart';
 import '../../../../domain/repositories/character_repository.dart';
+import '../../../../domain/repositories/chat_repository.dart';
 
 // Events
 abstract class HomeEvent extends Equatable {
@@ -40,9 +42,10 @@ class HomeLoading extends HomeState {}
 
 class HomeLoaded extends HomeState {
   final List<Character> characters;
-  HomeLoaded(this.characters);
+  final List<Chat> chats;
+  HomeLoaded({required this.characters, required this.chats});
   @override
-  List<Object> get props => [characters];
+  List<Object> get props => [characters, chats];
 }
 
 class HomeError extends HomeState {
@@ -55,8 +58,9 @@ class HomeError extends HomeState {
 // BLoC
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final CharacterRepository _repository;
+  final ChatRepository _chatRepository;
 
-  HomeBloc(this._repository) : super(HomeInitial()) {
+  HomeBloc(this._repository, this._chatRepository) : super(HomeInitial()) {
     on<LoadCharacters>(_onLoad);
     on<SearchCharacters>(_onSearch);
     on<DeleteCharacter>(_onDelete);
@@ -65,10 +69,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   Future<void> _onLoad(LoadCharacters event, Emitter<HomeState> emit) async {
     emit(HomeLoading());
-    final result = await _repository.getAllCharacters();
-    result.fold(
+    final charResult = await _repository.getAllCharacters();
+    final chatResult = await _chatRepository.getAllChats();
+    
+    charResult.fold(
       (failure) => emit(HomeError(failure.message)),
-      (characters) => emit(HomeLoaded(characters)),
+      (characters) {
+        chatResult.fold(
+          (failure) => emit(HomeError(failure.message)),
+          (chats) => emit(HomeLoaded(characters: characters, chats: chats)),
+        );
+      },
     );
   }
 
@@ -78,9 +89,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   ) async {
     emit(HomeLoading());
     final result = await _repository.searchCharacters(event.query);
+    final chatResult = await _chatRepository.getAllChats();
     result.fold(
       (failure) => emit(HomeError(failure.message)),
-      (characters) => emit(HomeLoaded(characters)),
+      (characters) {
+        chatResult.fold(
+          (failure) => emit(HomeError(failure.message)),
+          (chats) => emit(HomeLoaded(characters: characters, chats: chats)),
+        );
+      },
     );
   }
 

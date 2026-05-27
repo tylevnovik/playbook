@@ -67,7 +67,7 @@ abstract class AppModule {
 
   // Use cases
   @injectable
-  SendMessage sendMessage(LlmRepository lr, ChatRepository cr, SettingsRepository sr) => SendMessage(llmRepository: lr, chatRepository: cr, settingsRepository: sr);
+  SendMessage sendMessage(LlmRepository lr, ChatRepository cr, SettingsRepository sr, CharacterRepository chr, BuildPrompt bp) => SendMessage(llmRepository: lr, chatRepository: cr, settingsRepository: sr, characterRepository: chr, buildPrompt: bp);
 
   @injectable
   LoadCharacter loadCharacter(CharacterRepository cr, ChatRepository chr) => LoadCharacter(characterRepository: cr, chatRepository: chr);

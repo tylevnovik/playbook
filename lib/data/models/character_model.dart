@@ -12,7 +12,9 @@ class CharacterModel {
       exampleMessages: map['example_messages'] as String?,
       systemPrompt: map['system_prompt'] as String?,
       tags: List<String>.from(jsonDecode(map['tags'] as String? ?? '[]')),
-      worldBookId: map['world_book_id'] as String?,
+      worldBookIds: map['world_book_ids'] != null
+          ? List<String>.from(map['world_book_ids'] as List)
+          : [],
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       lastChattedAt: map['last_chatted_at'] != null
@@ -31,7 +33,7 @@ class CharacterModel {
       'example_messages': character.exampleMessages,
       'system_prompt': character.systemPrompt,
       'tags': jsonEncode(character.tags),
-      'world_book_id': character.worldBookId,
+      'world_book_ids': character.worldBookIds,
       'created_at': character.createdAt.toIso8601String(),
       'updated_at': character.updatedAt.toIso8601String(),
       'last_chatted_at': character.lastChattedAt?.toIso8601String(),

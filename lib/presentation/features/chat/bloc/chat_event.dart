@@ -7,11 +7,10 @@ abstract class ChatEvent extends Equatable {
 }
 
 class LoadChat extends ChatEvent {
-  final String characterId;
-  final String? chatId;
-  LoadChat({required this.characterId, this.chatId});
+  final String chatId;
+  LoadChat({required this.chatId});
   @override
-  List<Object?> get props => [characterId, chatId];
+  List<Object?> get props => [chatId];
 }
 
 class SendChatMessage extends ChatEvent {
@@ -35,4 +34,25 @@ class SwitchToSiblingBranch extends ChatEvent {
   SwitchToSiblingBranch(this.messageId, {required this.next});
   @override
   List<Object?> get props => [messageId, next];
+}
+
+class UpdateChatCharacters extends ChatEvent {
+  final List<String> characterIds;
+  UpdateChatCharacters(this.characterIds);
+  @override
+  List<Object?> get props => [characterIds];
+}
+
+class UpdateChatWorldBooks extends ChatEvent {
+  final List<String> worldBookIds;
+  UpdateChatWorldBooks(this.worldBookIds);
+  @override
+  List<Object?> get props => [worldBookIds];
+}
+
+class SetActiveCharacter extends ChatEvent {
+  final String characterId;
+  SetActiveCharacter(this.characterId);
+  @override
+  List<Object?> get props => [characterId];
 }

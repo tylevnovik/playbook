@@ -7,14 +7,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
-import '../../../domain/entities/character.dart';
+import '../../../domain/entities/chat.dart';
 import '../../../domain/repositories/character_repository.dart';
+import '../../../domain/repositories/chat_repository.dart';
 import '../../features/home/bloc/home_bloc.dart';
 
 class DesktopCharacterSidebar extends StatelessWidget {
-  final String? selectedCharacterId;
+  final String? selectedChatId;
 
-  const DesktopCharacterSidebar({super.key, this.selectedCharacterId});
+  const DesktopCharacterSidebar({super.key, this.selectedChatId});
 
   @override
   Widget build(BuildContext context) {
@@ -56,9 +57,9 @@ class DesktopCharacterSidebar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
-                  icon: const Icon(Icons.add, size: 20),
-                  onPressed: () => context.push('/character/new'),
-                  tooltip: loc.get('createCharacter'),
+                  icon: const Icon(Icons.add_comment, size: 20),
+                  onPressed: () => _createNewChat(context),
+                  tooltip: '新建会话',
                 ),
                 const SizedBox(width: 8),
                 IconButton.filledTonal(
@@ -88,11 +89,11 @@ class DesktopCharacterSidebar extends StatelessWidget {
                   );
                 }
                 if (state is HomeLoaded) {
-                  final characters = state.characters;
-                  if (characters.isEmpty) {
+                  final chats = state.chats;
+                  if (chats.isEmpty) {
                     return Center(
                       child: Text(
-                        loc.get('noCharacters'),
+                        '暂无会话',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -101,10 +102,26 @@ class DesktopCharacterSidebar extends StatelessWidget {
                   }
 
                   return ListView.builder(
-                    itemCount: characters.length,
+                    itemCount: chats.length,
                     itemBuilder: (context, index) {
-                      final char = characters[index];
-                      final isSelected = char.id == selectedCharacterId;
+                      final chat = chats[index];
+                      final isSelected = chat.id == selectedChatId;
+
+                      final chatCharacters = state.characters
+                          .where((c) => chat.characterIds.contains(c.id))
+                          .toList();
+
+                      String displayName = '未命名会话';
+                      String? displayAvatar;
+                      if (chatCharacters.isNotEmpty) {
+                        if (chatCharacters.length == 1) {
+                          displayName = chatCharacters.first.name;
+                          displayAvatar = chatCharacters.first.avatarPath;
+                        } else {
+                          displayName = chatCharacters.map((c) => c.name).join(', ');
+                          displayAvatar = chatCharacters.first.avatarPath;
+                        }
+                      }
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(
@@ -112,7 +129,7 @@ class DesktopCharacterSidebar extends StatelessWidget {
                           vertical: 4.0,
                         ),
                         child: InkWell(
-                          onTap: () => context.go('/chat/${char.id}'),
+                          onTap: () => context.go('/chat/${chat.id}'),
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -136,25 +153,25 @@ class DesktopCharacterSidebar extends StatelessWidget {
                                   backgroundColor:
                                       theme.colorScheme.primaryContainer,
                                   backgroundImage:
-                                      char.avatarPath != null &&
-                                          char.avatarPath!.isNotEmpty
-                                      ? NetworkImage(char.avatarPath!)
-                                      : null,
+                                      displayAvatar != null &&
+                                              displayAvatar.isNotEmpty
+                                          ? NetworkImage(displayAvatar)
+                                          : null,
                                   child:
-                                      char.avatarPath == null ||
-                                          char.avatarPath!.isEmpty
-                                      ? Text(
-                                          char.name.isNotEmpty
-                                              ? char.name[0].toUpperCase()
-                                              : '?',
-                                          style: TextStyle(
-                                            color: theme
-                                                .colorScheme
-                                                .onPrimaryContainer,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
+                                      displayAvatar == null ||
+                                              displayAvatar.isEmpty
+                                          ? Text(
+                                              displayName.isNotEmpty
+                                                  ? displayName[0].toUpperCase()
+                                                  : '?',
+                                              style: TextStyle(
+                                                color: theme
+                                                    .colorScheme
+                                                    .onPrimaryContainer,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -163,7 +180,7 @@ class DesktopCharacterSidebar extends StatelessWidget {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        char.name,
+                                        displayName,
                                         style: theme.textTheme.titleSmall
                                             ?.copyWith(
                                               fontWeight: isSelected
@@ -175,7 +192,11 @@ class DesktopCharacterSidebar extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        char.description,
+                                        chatCharacters.length > 1
+                                            ? '群聊 (${chatCharacters.length}个角色)'
+                                            : (chatCharacters.isNotEmpty
+                                                ? chatCharacters.first.description
+                                                : '无参与角色'),
                                         style: theme.textTheme.bodySmall
                                             ?.copyWith(
                                               color: theme
@@ -193,17 +214,11 @@ class DesktopCharacterSidebar extends StatelessWidget {
                                   padding: EdgeInsets.zero,
                                   constraints: const BoxConstraints(),
                                   onSelected: (value) {
-                                    if (value == 'edit') {
-                                      context.push('/character/${char.id}');
-                                    } else if (value == 'delete') {
-                                      _confirmDelete(context, char);
+                                    if (value == 'delete') {
+                                      _confirmDelete(context, chat, displayName);
                                     }
                                   },
                                   itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text(loc.get('edit')),
-                                    ),
                                     PopupMenuItem(
                                       value: 'delete',
                                       child: Text(loc.get('delete')),
@@ -227,23 +242,48 @@ class DesktopCharacterSidebar extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, Character character) {
+  void _createNewChat(BuildContext context) async {
+    final result = await getIt<ChatRepository>().createChat(characterIds: []);
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建会话失败: ${failure.message}')),
+        );
+      },
+      (chat) {
+        context.read<HomeBloc>().add(LoadCharacters());
+        context.go('/chat/${chat.id}');
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Chat chat, String name) {
     final loc = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.get('deleteCharacter')),
-        content: Text(loc.get('deleteConfirm')),
+        title: const Text('删除会话'),
+        content: Text('你确定要删除与 "$name" 的聊天会话吗？历史消息将被彻底删除，此操作不可撤销。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(loc.get('cancel')),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.read<HomeBloc>().add(DeleteCharacter(character.id));
-              context.go('/');
+              final result = await getIt<ChatRepository>().deleteChat(chat.id);
+              result.fold(
+                (failure) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('删除会话失败: ${failure.message}')),
+                  );
+                },
+                (_) {
+                  context.read<HomeBloc>().add(LoadCharacters());
+                  context.go('/');
+                },
+              );
             },
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,

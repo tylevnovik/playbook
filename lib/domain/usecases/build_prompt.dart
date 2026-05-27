@@ -12,7 +12,9 @@ class BuildPrompt {
   BuildPrompt({required this.worldBookRepository});
 
   Future<Either<Failure, List<Message>>> call({
-    required Character character,
+    required Character activeCharacter,
+    required List<Character> allCharacters,
+    required List<String> worldBookIds,
     required List<Message> messages,
     required LlmConfig config,
     String? username,
@@ -22,7 +24,7 @@ class BuildPrompt {
     int tokenBudget = config.contextWindow - config.maxTokens;
 
     // 1. System prompt
-    final systemPrompt = _buildSystemPrompt(character, username);
+    final systemPrompt = _buildSystemPrompt(activeCharacter, allCharacters, username);
     promptMessages.add(Message(
       id: 'system',
       chatId: '',
@@ -33,29 +35,42 @@ class BuildPrompt {
     tokenBudget -= TokenEstimator.estimate(systemPrompt);
 
     // 2. World book entries (if linked)
-    if (character.worldBookId != null) {
-      final entriesResult = await worldBookRepository.matchEntries(
-        character.worldBookId!,
-        messages.map((m) => m.content).join(' '),
-      );
-      entriesResult.fold(
-        (failure) => null, // Skip on error
-        (entries) {
-          if (entries.isNotEmpty) {
-            final worldContext = entries.map((e) => e.content).join('\n\n');
-            tokenBudget -= TokenEstimator.estimate(worldContext);
-            if (tokenBudget > 0) {
-              promptMessages.add(Message(
-                id: 'world_context',
-                chatId: '',
-                role: MessageRole.system,
-                content: '## World Context\n$worldContext',
-                createdAt: DateTime.now(),
-              ));
-            }
+    if (worldBookIds.isNotEmpty) {
+      final allMatchedEntries = <dynamic>[];
+      for (final wbId in worldBookIds) {
+        final entriesResult = await worldBookRepository.matchEntries(
+          wbId,
+          messages.map((m) => m.content).join(' '),
+        );
+        entriesResult.fold(
+          (failure) => null,
+          (entries) => allMatchedEntries.addAll(entries),
+        );
+      }
+
+      if (allMatchedEntries.isNotEmpty) {
+        final uniqueEntries = <String, dynamic>{};
+        for (final entry in allMatchedEntries) {
+          final existing = uniqueEntries[entry.id];
+          if (existing == null || entry.priority > existing.priority) {
+            uniqueEntries[entry.id] = entry;
           }
-        },
-      );
+        }
+        final sortedEntries = uniqueEntries.values.toList()
+          ..sort((a, b) => b.priority.compareTo(a.priority));
+
+        final worldContext = sortedEntries.map((e) => e.content).join('\n\n');
+        tokenBudget -= TokenEstimator.estimate(worldContext);
+        if (tokenBudget > 0) {
+          promptMessages.add(Message(
+            id: 'world_context',
+            chatId: '',
+            role: MessageRole.system,
+            content: '## World Context\n$worldContext',
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
     }
 
     // 3. Summary (if exists)
@@ -84,21 +99,27 @@ class BuildPrompt {
     return Right(promptMessages);
   }
 
-  String _buildSystemPrompt(Character character, String? username) {
+  String _buildSystemPrompt(Character activeCharacter, List<Character> allCharacters, String? username) {
     final userName = username ?? 'User';
-    final customPrompt = character.systemPrompt ?? '';
+    final customPrompt = activeCharacter.systemPrompt ?? '';
     
-    return '''You are ${character.name}. Stay in character at all times.
+    final otherChars = allCharacters.where((c) => c.id != activeCharacter.id);
+    final otherCharsPrompt = otherChars.isNotEmpty
+        ? '\n## Other Characters in this Group Chat\n${otherChars.map((c) => '- Name: ${c.name}\n  Description: ${c.description}').join('\n')}'
+        : '';
+    
+    return '''You are ${activeCharacter.name}. Stay in character at all times.
 
 ## Character Description
-${character.description}
+${activeCharacter.description}
+$otherCharsPrompt
 
 $customPrompt
 
 ## Rules
 - Never break character
 - Never refer to yourself as an AI or language model
-- Respond as ${character.name} would, based on the character description
+- Respond as ${activeCharacter.name} would, based on the character description
 - Use * for actions, " for dialogue
 - Keep responses engaging and in-character
 - The user's name is $userName''';

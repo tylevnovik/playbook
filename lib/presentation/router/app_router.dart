@@ -37,11 +37,14 @@ class AppRouter {
                 CharacterEditPage(characterId: state.pathParameters['id']),
           ),
           GoRoute(
-            path: '/chat/:characterId',
-            builder: (context, state) => ChatPage(
-              characterId: state.pathParameters['characterId']!,
-              chatId: state.uri.queryParameters['chatId'],
-            ),
+            path: '/chat/:chatId',
+            builder: (context, state) {
+              final chatId = state.pathParameters['chatId']!;
+              return ChatPage(
+                key: ValueKey(chatId),
+                chatId: chatId,
+              );
+            },
           ),
           GoRoute(
             path: '/worldbook',

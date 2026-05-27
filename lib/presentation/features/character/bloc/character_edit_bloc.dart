@@ -36,7 +36,7 @@ class ImportCharacterJson extends CharacterEditEvent {
 // States
 abstract class CharacterEditState extends Equatable {
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
 class CharacterEditInitial extends CharacterEditState {}
@@ -46,7 +46,7 @@ class CharacterEditLoaded extends CharacterEditState {
   CharacterEditLoaded(this.character);
 
   @override
-  List<Object> get props => [?character];
+  List<Object?> get props => [character];
 }
 class CharacterEditSaved extends CharacterEditState {}
 class CharacterEditError extends CharacterEditState {
@@ -54,7 +54,7 @@ class CharacterEditError extends CharacterEditState {
   CharacterEditError(this.message);
 
   @override
-  List<Object> get props => [message];
+  List<Object?> get props => [message];
 }
 
 // BLoC
