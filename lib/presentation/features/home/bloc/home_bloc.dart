@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../data/samples/sample_content.dart';
 import '../../../../domain/entities/character.dart';
 import '../../../../domain/repositories/character_repository.dart';
 
@@ -25,6 +26,8 @@ class DeleteCharacter extends HomeEvent {
   List<Object> get props => [id];
 }
 
+class CreateExampleCharacters extends HomeEvent {}
+
 // States
 abstract class HomeState extends Equatable {
   @override
@@ -32,13 +35,16 @@ abstract class HomeState extends Equatable {
 }
 
 class HomeInitial extends HomeState {}
+
 class HomeLoading extends HomeState {}
+
 class HomeLoaded extends HomeState {
   final List<Character> characters;
   HomeLoaded(this.characters);
   @override
   List<Object> get props => [characters];
 }
+
 class HomeError extends HomeState {
   final String message;
   HomeError(this.message);
@@ -54,6 +60,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<LoadCharacters>(_onLoad);
     on<SearchCharacters>(_onSearch);
     on<DeleteCharacter>(_onDelete);
+    on<CreateExampleCharacters>(_onCreateExamples);
   }
 
   Future<void> _onLoad(LoadCharacters event, Emitter<HomeState> emit) async {
@@ -65,7 +72,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
-  Future<void> _onSearch(SearchCharacters event, Emitter<HomeState> emit) async {
+  Future<void> _onSearch(
+    SearchCharacters event,
+    Emitter<HomeState> emit,
+  ) async {
     emit(HomeLoading());
     final result = await _repository.searchCharacters(event.query);
     result.fold(
@@ -76,6 +86,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
 
   Future<void> _onDelete(DeleteCharacter event, Emitter<HomeState> emit) async {
     await _repository.deleteCharacter(event.id);
+    add(LoadCharacters());
+  }
+
+  Future<void> _onCreateExamples(
+    CreateExampleCharacters event,
+    Emitter<HomeState> emit,
+  ) async {
+    for (final character in SampleContent.characters()) {
+      final result = await _repository.createCharacter(character);
+      if (result.isLeft()) {
+        result.fold((failure) => emit(HomeError(failure.message)), (_) => null);
+        return;
+      }
+    }
     add(LoadCharacters());
   }
 }

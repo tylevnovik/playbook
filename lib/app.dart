@@ -20,15 +20,18 @@ class PlaybookApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(
-          create: (_) => HomeBloc(getIt<CharacterRepository>())..add(LoadCharacters()),
+          create: (_) =>
+              HomeBloc(getIt<CharacterRepository>())..add(LoadCharacters()),
         ),
         BlocProvider(
-          create: (_) => SettingsBloc(getIt<SettingsRepository>())..add(LoadSettings()),
+          create: (_) =>
+              SettingsBloc(getIt<SettingsRepository>())..add(LoadSettings()),
         ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {
           Locale locale = const Locale('zh', 'CN'); // Default to Chinese
+          var themeMode = ThemeMode.system;
           if (settingsState is SettingsLoaded) {
             final langCode = settingsState.values[AppConstants.keyLanguage];
             if (langCode != null && langCode.isNotEmpty) {
@@ -38,6 +41,13 @@ class PlaybookApp extends StatelessWidget {
                 locale = const Locale('zh', 'CN');
               }
             }
+
+            themeMode =
+                switch (settingsState.values[AppConstants.keyThemeMode]) {
+                  'light' => ThemeMode.light,
+                  'dark' => ThemeMode.dark,
+                  _ => ThemeMode.system,
+                };
           }
 
           return DynamicColorBuilder(
@@ -57,7 +67,7 @@ class PlaybookApp extends StatelessWidget {
                 ],
                 theme: AppTheme.light(seedColor: lightDynamic?.primary),
                 darkTheme: AppTheme.dark(seedColor: darkDynamic?.primary),
-                themeMode: ThemeMode.system,
+                themeMode: themeMode,
                 routerConfig: AppRouter.router,
                 debugShowCheckedModeBanner: false,
               );

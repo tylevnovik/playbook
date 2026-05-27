@@ -129,6 +129,17 @@ class _HomeMobileView extends StatelessWidget {
                       loc.get('tapToCreate'),
                       style: theme.textTheme.bodyMedium,
                     ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: Text(loc.get('addExampleCharacters')),
+                      onPressed: () {
+                        context.read<HomeBloc>().add(CreateExampleCharacters());
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(loc.get('examplesAdded'))),
+                        );
+                      },
+                    ),
                   ],
                 ),
               );
@@ -222,6 +233,17 @@ class _HomeDesktopView extends StatelessWidget {
                         vertical: 16,
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: Text(loc.get('addExampleCharacters')),
+                    onPressed: () {
+                      context.read<HomeBloc>().add(CreateExampleCharacters());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(loc.get('examplesAdded'))),
+                      );
+                    },
                   ),
                 ],
               ),

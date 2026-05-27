@@ -365,6 +365,17 @@ class _WorldBookPageState extends State<WorldBookPage> {
                 loc.get('tapToCreateBook'),
                 style: theme.textTheme.bodyMedium,
               ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.auto_awesome_outlined),
+                label: Text(loc.get('addExampleWorldBooks')),
+                onPressed: () {
+                  bloc.add(CreateExampleWorldBooks());
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(loc.get('examplesAdded'))),
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -588,6 +599,17 @@ class _WorldBookPageState extends State<WorldBookPage> {
                   Text(
                     loc.get('tapToCreateBook'),
                     style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: Text(loc.get('addExampleWorldBooks')),
+                    onPressed: () {
+                      bloc.add(CreateExampleWorldBooks());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(loc.get('examplesAdded'))),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../domain/entities/message.dart';
 import '../../../domain/entities/llm_config.dart';
 import 'llm_provider.dart';
@@ -16,7 +17,10 @@ class GeminiProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async {
     final response = await _dio.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}',
+      _joinPath(
+        _baseUrl(config),
+        '/${_modelPath(config.model)}:generateContent?key=${Uri.encodeComponent(config.apiKey)}',
+      ),
       options: Options(headers: {'Content-Type': 'application/json'}),
       data: jsonEncode(_buildRequest(messages, config, attachments)),
     );
@@ -35,7 +39,10 @@ class GeminiProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async* {
     final response = await _dio.post(
-      'https://generativelanguage.googleapis.com/v1beta/models/${config.model}:streamGenerateContent?key=${config.apiKey}',
+      _joinPath(
+        _baseUrl(config),
+        '/${_modelPath(config.model)}:streamGenerateContent?key=${Uri.encodeComponent(config.apiKey)}',
+      ),
       options: Options(
         headers: {'Content-Type': 'application/json'},
         responseType: ResponseType.stream,
@@ -54,7 +61,8 @@ class GeminiProvider implements LlmProvider {
           final json = jsonDecode(buffer);
           buffer = '';
           if (json is List && json.isNotEmpty) {
-            final text = json.last['candidates']?[0]?['content']?['parts']?[0]?['text'];
+            final text =
+                json.last['candidates']?[0]?['content']?['parts']?[0]?['text'];
             if (text != null) {
               yield ChatChunk(content: text as String);
             }
@@ -77,15 +85,16 @@ class GeminiProvider implements LlmProvider {
       if (msg.role == MessageRole.system) {
         systemInstruction = msg.content;
       } else {
-        final parts = <Map<String, dynamic>>[{'text': msg.content}];
-        
-        if (attachments != null && attachments.isNotEmpty && msg.role == MessageRole.user) {
+        final parts = <Map<String, dynamic>>[
+          {'text': msg.content},
+        ];
+
+        if (attachments != null &&
+            attachments.isNotEmpty &&
+            msg.role == MessageRole.user) {
           for (final a in attachments) {
             parts.add({
-              'inline_data': {
-                'mime_type': a.mimeType,
-                'data': a.path,
-              },
+              'inline_data': {'mime_type': a.mimeType, 'data': a.path},
             });
           }
         }
@@ -106,9 +115,31 @@ class GeminiProvider implements LlmProvider {
     };
 
     if (systemInstruction != null) {
-      request['systemInstruction'] = {'parts': [{'text': systemInstruction}]};
+      request['systemInstruction'] = {
+        'parts': [
+          {'text': systemInstruction},
+        ],
+      };
     }
 
     return request;
+  }
+
+  String _baseUrl(LlmConfig config) {
+    final value = config.baseUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return AppConstants.defaultGeminiBaseUrl;
+    }
+    return value;
+  }
+
+  String _modelPath(String model) {
+    final trimmed = model.trim();
+    return trimmed.startsWith('models/') ? trimmed : 'models/$trimmed';
+  }
+
+  String _joinPath(String baseUrl, String path) {
+    final normalized = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+    return '$normalized$path';
   }
 }

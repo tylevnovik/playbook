@@ -8,13 +8,11 @@ import '../features/character/character_edit_page.dart';
 import '../features/chat/chat_page.dart';
 import '../features/worldbook/world_book_page.dart';
 import '../features/settings/settings_page.dart';
-import '../features/splash/splash_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/splash',
+    initialLocation: '/',
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
       ShellRoute(
         builder: (context, state, child) {
           final body = OfflineBanner(child: child);

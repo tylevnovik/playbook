@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../domain/entities/message.dart';
 import '../../../domain/entities/llm_config.dart';
 import 'llm_provider.dart';
@@ -16,9 +17,9 @@ class AnthropicProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async {
     final formatted = _formatMessages(messages, attachments);
-    
+
     final response = await _dio.post(
-      'https://api.anthropic.com/v1/messages',
+      _joinVersionedPath(_baseUrl(config), '/v1/messages'),
       options: Options(
         headers: {
           'x-api-key': config.apiKey,
@@ -37,7 +38,8 @@ class AnthropicProvider implements LlmProvider {
     final data = response.data;
     return ChatResponse(
       content: data['content'][0]['text'] as String,
-      tokensUsed: (data['usage']?['input_tokens'] as int? ?? 0) +
+      tokensUsed:
+          (data['usage']?['input_tokens'] as int? ?? 0) +
           (data['usage']?['output_tokens'] as int? ?? 0),
     );
   }
@@ -49,9 +51,9 @@ class AnthropicProvider implements LlmProvider {
     List<MessageAttachment>? attachments,
   }) async* {
     final formatted = _formatMessages(messages, attachments);
-    
+
     final response = await _dio.post(
-      'https://api.anthropic.com/v1/messages',
+      _joinVersionedPath(_baseUrl(config), '/v1/messages'),
       options: Options(
         headers: {
           'x-api-key': config.apiKey,
@@ -107,17 +109,22 @@ class AnthropicProvider implements LlmProvider {
       } else {
         formattedMessages.add({
           'role': msg.role.name,
-          'content': msg.role == MessageRole.user && attachments != null && attachments.isNotEmpty
+          'content':
+              msg.role == MessageRole.user &&
+                  attachments != null &&
+                  attachments.isNotEmpty
               ? [
                   {'type': 'text', 'text': msg.content},
-                  ...attachments.map((a) => {
-                    'type': 'image',
-                    'source': {
-                      'type': 'base64',
-                      'media_type': a.mimeType,
-                      'data': a.path,
+                  ...attachments.map(
+                    (a) => {
+                      'type': 'image',
+                      'source': {
+                        'type': 'base64',
+                        'media_type': a.mimeType,
+                        'data': a.path,
+                      },
                     },
-                  }),
+                  ),
                 ]
               : msg.content,
         });
@@ -129,11 +136,30 @@ class AnthropicProvider implements LlmProvider {
       messages: formattedMessages,
     );
   }
+
+  String _baseUrl(LlmConfig config) {
+    final value = config.baseUrl?.trim();
+    if (value == null || value.isEmpty) {
+      return AppConstants.defaultAnthropicBaseUrl;
+    }
+    return value;
+  }
+
+  String _joinVersionedPath(String baseUrl, String path) {
+    final normalized = baseUrl.trim().replaceFirst(RegExp(r'/+$'), '');
+    if (normalized.endsWith('/v1') && path.startsWith('/v1/')) {
+      return '$normalized${path.substring(3)}';
+    }
+    return '$normalized$path';
+  }
 }
 
 class _FormattedMessages {
   final String systemPrompt;
   final List<Map<String, dynamic>> messages;
-  
-  const _FormattedMessages({required this.systemPrompt, required this.messages});
+
+  const _FormattedMessages({
+    required this.systemPrompt,
+    required this.messages,
+  });
 }

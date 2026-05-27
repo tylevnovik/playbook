@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import '../../../../data/samples/sample_content.dart';
 import '../../../../domain/entities/world_book.dart';
 import '../../../../domain/repositories/world_book_repository.dart';
 
@@ -48,6 +49,8 @@ class DeleteEntryEvent extends WorldBookEvent {
   List<Object?> get props => [entryId, worldBookId];
 }
 
+class CreateExampleWorldBooks extends WorldBookEvent {}
+
 // States
 abstract class WorldBookState extends Equatable {
   @override
@@ -55,7 +58,9 @@ abstract class WorldBookState extends Equatable {
 }
 
 class WorldBookInitial extends WorldBookState {}
+
 class WorldBookLoading extends WorldBookState {}
+
 class WorldBookLoaded extends WorldBookState {
   final List<WorldBook> worldBooks;
   final String? selectedWorldBookId;
@@ -82,6 +87,7 @@ class WorldBookLoaded extends WorldBookState {
   @override
   List<Object?> get props => [worldBooks, selectedWorldBookId, entries];
 }
+
 class WorldBookError extends WorldBookState {
   final String message;
   WorldBookError(this.message);
@@ -100,9 +106,13 @@ class WorldBookBloc extends Bloc<WorldBookEvent, WorldBookState> {
     on<LoadEntriesEvent>(_onLoadEntries);
     on<SaveEntryEvent>(_onSaveEntry);
     on<DeleteEntryEvent>(_onDeleteEntry);
+    on<CreateExampleWorldBooks>(_onCreateExamples);
   }
 
-  Future<void> _onLoadWorldBooks(LoadWorldBooks event, Emitter<WorldBookState> emit) async {
+  Future<void> _onLoadWorldBooks(
+    LoadWorldBooks event,
+    Emitter<WorldBookState> emit,
+  ) async {
     emit(WorldBookLoading());
     final result = await _repository.getAllWorldBooks();
     await result.fold(
@@ -112,11 +122,13 @@ class WorldBookBloc extends Bloc<WorldBookEvent, WorldBookState> {
           final entriesResult = await _repository.getEntries(books.first.id);
           entriesResult.fold(
             (failure) => emit(WorldBookError(failure.message)),
-            (entries) => emit(WorldBookLoaded(
-              worldBooks: books,
-              selectedWorldBookId: books.first.id,
-              entries: entries,
-            )),
+            (entries) => emit(
+              WorldBookLoaded(
+                worldBooks: books,
+                selectedWorldBookId: books.first.id,
+                entries: entries,
+              ),
+            ),
           );
         } else {
           emit(WorldBookLoaded(worldBooks: const []));
@@ -125,7 +137,10 @@ class WorldBookBloc extends Bloc<WorldBookEvent, WorldBookState> {
     );
   }
 
-  Future<void> _onCreateWorldBook(CreateWorldBookEvent event, Emitter<WorldBookState> emit) async {
+  Future<void> _onCreateWorldBook(
+    CreateWorldBookEvent event,
+    Emitter<WorldBookState> emit,
+  ) async {
     final book = WorldBook(
       id: '',
       name: event.name,
@@ -137,32 +152,43 @@ class WorldBookBloc extends Bloc<WorldBookEvent, WorldBookState> {
     add(LoadWorldBooks());
   }
 
-  Future<void> _onDeleteWorldBook(DeleteWorldBookEvent event, Emitter<WorldBookState> emit) async {
+  Future<void> _onDeleteWorldBook(
+    DeleteWorldBookEvent event,
+    Emitter<WorldBookState> emit,
+  ) async {
     await _repository.deleteWorldBook(event.id);
     add(LoadWorldBooks());
   }
 
-  Future<void> _onLoadEntries(LoadEntriesEvent event, Emitter<WorldBookState> emit) async {
+  Future<void> _onLoadEntries(
+    LoadEntriesEvent event,
+    Emitter<WorldBookState> emit,
+  ) async {
     final currentState = state;
     if (currentState is WorldBookLoaded) {
       final entriesResult = await _repository.getEntries(event.worldBookId);
       entriesResult.fold(
         (failure) => emit(WorldBookError(failure.message)),
-        (entries) => emit(currentState.copyWith(
-          selectedWorldBookId: event.worldBookId,
-          entries: entries,
-        )),
+        (entries) => emit(
+          currentState.copyWith(
+            selectedWorldBookId: event.worldBookId,
+            entries: entries,
+          ),
+        ),
       );
     }
   }
 
-  Future<void> _onSaveEntry(SaveEntryEvent event, Emitter<WorldBookState> emit) async {
+  Future<void> _onSaveEntry(
+    SaveEntryEvent event,
+    Emitter<WorldBookState> emit,
+  ) async {
     final currentState = state;
     if (currentState is WorldBookLoaded) {
       final result = event.entry.id.isEmpty
           ? await _repository.createEntry(event.entry)
           : await _repository.updateEntry(event.entry);
-      
+
       await result.fold(
         (failure) async => emit(WorldBookError(failure.message)),
         (_) async {
@@ -172,8 +198,44 @@ class WorldBookBloc extends Bloc<WorldBookEvent, WorldBookState> {
     }
   }
 
-  Future<void> _onDeleteEntry(DeleteEntryEvent event, Emitter<WorldBookState> emit) async {
+  Future<void> _onDeleteEntry(
+    DeleteEntryEvent event,
+    Emitter<WorldBookState> emit,
+  ) async {
     await _repository.deleteEntry(event.entryId);
     add(LoadEntriesEvent(event.worldBookId));
+  }
+
+  Future<void> _onCreateExamples(
+    CreateExampleWorldBooks event,
+    Emitter<WorldBookState> emit,
+  ) async {
+    for (final template in SampleContent.worldBooks()) {
+      final bookResult = await _repository.createWorldBook(
+        template.toWorldBook(),
+      );
+      if (bookResult.isLeft()) {
+        bookResult.fold(
+          (failure) => emit(WorldBookError(failure.message)),
+          (_) => null,
+        );
+        return;
+      }
+
+      final book = bookResult.getOrElse(() => template.toWorldBook());
+      for (final entryTemplate in template.entries) {
+        final entryResult = await _repository.createEntry(
+          entryTemplate.toEntry(book.id),
+        );
+        if (entryResult.isLeft()) {
+          entryResult.fold(
+            (failure) => emit(WorldBookError(failure.message)),
+            (_) => null,
+          );
+          return;
+        }
+      }
+    }
+    add(LoadWorldBooks());
   }
 }

@@ -8,7 +8,11 @@ class WorldBookDao {
 
   Future<Map<String, dynamic>?> getById(String id) async {
     final db = await DatabaseService.database;
-    final results = await db.query('world_books', where: 'id = ?', whereArgs: [id]);
+    final results = await db.query(
+      'world_books',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return results.isNotEmpty ? results.first : null;
   }
 
@@ -34,7 +38,7 @@ class WorldBookDao {
       'world_book_entries',
       where: 'world_book_id = ?',
       whereArgs: [worldBookId],
-      orderBy: 'priority ASC',
+      orderBy: 'priority DESC',
     );
   }
 
@@ -45,7 +49,12 @@ class WorldBookDao {
 
   Future<void> updateEntry(String id, Map<String, dynamic> data) async {
     final db = await DatabaseService.database;
-    await db.update('world_book_entries', data, where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'world_book_entries',
+      data,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteEntry(String id) async {
@@ -53,17 +62,22 @@ class WorldBookDao {
     await db.delete('world_book_entries', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<List<Map<String, dynamic>>> matchEntries(String worldBookId, String text) async {
+  Future<List<Map<String, dynamic>>> matchEntries(
+    String worldBookId,
+    String text,
+  ) async {
     final db = await DatabaseService.database;
     final entries = await db.query(
       'world_book_entries',
       where: 'world_book_id = ? AND enabled = 1',
       whereArgs: [worldBookId],
     );
-    
+
     return entries.where((entry) {
       final keywords = (entry['keywords'] as String).split(',');
-      return keywords.any((k) => text.toLowerCase().contains(k.trim().toLowerCase()));
+      return keywords.any(
+        (k) => text.toLowerCase().contains(k.trim().toLowerCase()),
+      );
     }).toList();
   }
 }

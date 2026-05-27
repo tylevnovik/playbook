@@ -87,41 +87,72 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
-  Future<Either<Failure, LlmConfig>> getLlmConfig(LlmProviderType providerType) async {
+  Future<Either<Failure, LlmConfig>> getLlmConfig(
+    LlmProviderType providerType,
+  ) async {
     try {
       switch (providerType) {
         case LlmProviderType.openai:
           final apiKey = _prefs.getString(AppConstants.keyOpenaiApiKey) ?? '';
-          final baseUrl = _prefs.getString(AppConstants.keyOpenaiBaseUrl);
-          final model = _prefs.getString(AppConstants.keyOpenaiModel) ?? 'gpt-4o-mini';
-          return Right(LlmConfig(
-            providerType: LlmProviderType.openai,
-            apiKey: apiKey,
-            baseUrl: baseUrl,
-            model: model,
-            contextWindow: AppConstants.defaultMaxContextTokens,
-            maxTokens: AppConstants.defaultMaxResponseTokens,
-          ));
+          final baseUrl = _stringOrDefault(
+            AppConstants.keyOpenaiBaseUrl,
+            AppConstants.defaultOpenaiBaseUrl,
+          );
+          final model = _stringOrDefault(
+            AppConstants.keyOpenaiModel,
+            AppConstants.defaultOpenaiModel,
+          );
+          return Right(
+            LlmConfig(
+              providerType: LlmProviderType.openai,
+              apiKey: apiKey,
+              baseUrl: baseUrl,
+              model: model,
+              contextWindow: AppConstants.defaultOpenaiContextTokens,
+              maxTokens: AppConstants.defaultOpenaiMaxResponseTokens,
+            ),
+          );
         case LlmProviderType.anthropic:
-          final apiKey = _prefs.getString(AppConstants.keyAnthropicApiKey) ?? '';
-          final model = _prefs.getString(AppConstants.keyAnthropicModel) ?? 'claude-3-5-sonnet-latest';
-          return Right(LlmConfig(
-            providerType: LlmProviderType.anthropic,
-            apiKey: apiKey,
-            model: model,
-            contextWindow: AppConstants.defaultMaxContextTokens,
-            maxTokens: AppConstants.defaultMaxResponseTokens,
-          ));
+          final apiKey =
+              _prefs.getString(AppConstants.keyAnthropicApiKey) ?? '';
+          final baseUrl = _stringOrDefault(
+            AppConstants.keyAnthropicBaseUrl,
+            AppConstants.defaultAnthropicBaseUrl,
+          );
+          final model = _stringOrDefault(
+            AppConstants.keyAnthropicModel,
+            AppConstants.defaultAnthropicModel,
+          );
+          return Right(
+            LlmConfig(
+              providerType: LlmProviderType.anthropic,
+              apiKey: apiKey,
+              baseUrl: baseUrl,
+              model: model,
+              contextWindow: AppConstants.defaultAnthropicContextTokens,
+              maxTokens: AppConstants.defaultAnthropicMaxResponseTokens,
+            ),
+          );
         case LlmProviderType.gemini:
           final apiKey = _prefs.getString(AppConstants.keyGeminiApiKey) ?? '';
-          final model = _prefs.getString(AppConstants.keyGeminiModel) ?? 'gemini-1.5-flash';
-          return Right(LlmConfig(
-            providerType: LlmProviderType.gemini,
-            apiKey: apiKey,
-            model: model,
-            contextWindow: AppConstants.defaultMaxContextTokens,
-            maxTokens: AppConstants.defaultMaxResponseTokens,
-          ));
+          final baseUrl = _stringOrDefault(
+            AppConstants.keyGeminiBaseUrl,
+            AppConstants.defaultGeminiBaseUrl,
+          );
+          final model = _stringOrDefault(
+            AppConstants.keyGeminiModel,
+            AppConstants.defaultGeminiModel,
+          );
+          return Right(
+            LlmConfig(
+              providerType: LlmProviderType.gemini,
+              apiKey: apiKey,
+              baseUrl: baseUrl,
+              model: model,
+              contextWindow: AppConstants.defaultGeminiContextTokens,
+              maxTokens: AppConstants.defaultGeminiMaxResponseTokens,
+            ),
+          );
       }
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -131,11 +162,22 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<Either<Failure, LlmProviderType>> getDefaultProvider() async {
     try {
-      final value = _prefs.getString(AppConstants.keyDefaultProvider) ?? LlmProviderType.openai.name;
-      final type = LlmProviderType.values.firstWhere((e) => e.name == value, orElse: () => LlmProviderType.openai);
+      final value =
+          _prefs.getString(AppConstants.keyDefaultProvider) ??
+          LlmProviderType.openai.name;
+      final type = LlmProviderType.values.firstWhere(
+        (e) => e.name == value,
+        orElse: () => LlmProviderType.openai,
+      );
       return Right(type);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }
+  }
+
+  String _stringOrDefault(String key, String fallback) {
+    final value = _prefs.getString(key);
+    if (value == null || value.trim().isEmpty) return fallback;
+    return value.trim();
   }
 }

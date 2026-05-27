@@ -237,11 +237,18 @@ class SettingsPage extends StatelessWidget {
         ApiConfigSection(
           values: state.values,
           defaultProvider: state.defaultProvider,
+          diagnostics: state.diagnostics,
           onUpdateSetting: (key, val) {
             bloc.add(UpdateStringSetting(key: key, value: val));
           },
           onUpdateProvider: (providerType) {
             bloc.add(UpdateProviderSetting(providerType));
+          },
+          onTestProvider: (providerType) {
+            bloc.add(TestProviderConnection(providerType));
+          },
+          onDiscoverModels: (providerType) {
+            bloc.add(DiscoverProviderModels(providerType));
           },
         ),
         const SizedBox(height: 16),
