@@ -23,17 +23,17 @@ class SendMessage {
   }) async {
     // 1. Get LLM config
     final providerResult = await settingsRepository.getDefaultProvider();
-    return providerResult.fold(
-      (failure) => Left(failure),
+    return await providerResult.fold(
+      (failure) async => Left(failure),
       (providerType) async {
         final configResult = await settingsRepository.getLlmConfig(providerType);
-        return configResult.fold(
-          (failure) => Left(failure),
+        return await configResult.fold(
+          (failure) async => Left(failure),
           (config) async {
             // 2. Load recent messages
             final messagesResult = await chatRepository.getMessages(chatId);
-            return messagesResult.fold(
-              (failure) => Left(failure),
+            return await messagesResult.fold(
+              (failure) async => Left(failure),
               (messages) async {
                 // 3. Save user message
                 final userMessage = Message(
@@ -44,26 +44,30 @@ class SendMessage {
                   attachments: attachments,
                   createdAt: DateTime.now(),
                 );
-                await chatRepository.saveMessage(userMessage);
-
-                // 4. Send to LLM
-                final responseResult = await llmRepository.sendMessage(
-                  messages: [...messages, userMessage],
-                  config: config,
-                  attachments: attachments,
-                );
-                return responseResult.fold(
-                  (failure) => Left(failure),
-                  (responseContent) async {
-                    // 5. Save assistant message
-                    final assistantMessage = Message(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      chatId: chatId,
-                      role: MessageRole.assistant,
-                      content: responseContent,
-                      createdAt: DateTime.now(),
+                final saveUserResult = await chatRepository.saveMessage(userMessage);
+                return await saveUserResult.fold(
+                  (failure) async => Left(failure),
+                  (_) async {
+                    // 4. Send to LLM
+                    final responseResult = await llmRepository.sendMessage(
+                      messages: [...messages, userMessage],
+                      config: config,
+                      attachments: attachments,
                     );
-                    return Right(await chatRepository.saveMessage(assistantMessage));
+                    return await responseResult.fold(
+                      (failure) async => Left(failure),
+                      (responseContent) async {
+                        // 5. Save assistant message
+                        final assistantMessage = Message(
+                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                          chatId: chatId,
+                          role: MessageRole.assistant,
+                          content: responseContent,
+                          createdAt: DateTime.now(),
+                        );
+                        return await chatRepository.saveMessage(assistantMessage);
+                      },
+                    );
                   },
                 );
               },
