@@ -4,14 +4,21 @@ import '../../core/utils/token_estimator.dart';
 import '../entities/character.dart';
 import '../entities/message.dart';
 import '../entities/llm_config.dart';
+import '../entities/story_state.dart';
 import '../repositories/world_book_repository.dart';
+import '../repositories/story_state_repository.dart';
 
 class BuildPrompt {
   final WorldBookRepository worldBookRepository;
+  final StoryStateRepository storyStateRepository;
 
-  BuildPrompt({required this.worldBookRepository});
+  BuildPrompt({
+    required this.worldBookRepository,
+    required this.storyStateRepository,
+  });
 
   Future<Either<Failure, List<Message>>> call({
+    required String chatId,
     required Character activeCharacter,
     required List<Character> allCharacters,
     required List<String> worldBookIds,
@@ -37,10 +44,11 @@ class BuildPrompt {
     // 2. World book entries (if linked)
     if (worldBookIds.isNotEmpty) {
       final allMatchedEntries = <dynamic>[];
+      final recentText = messages.reversed.take(5).map((m) => m.content).join(' ');
       for (final wbId in worldBookIds) {
         final entriesResult = await worldBookRepository.matchEntries(
           wbId,
-          messages.map((m) => m.content).join(' '),
+          recentText,
         );
         entriesResult.fold(
           (failure) => null,
@@ -59,7 +67,9 @@ class BuildPrompt {
         final sortedEntries = uniqueEntries.values.toList()
           ..sort((a, b) => b.priority.compareTo(a.priority));
 
-        final worldContext = sortedEntries.map((e) => e.content).join('\n\n');
+        final limitedEntries = sortedEntries.take(5).toList();
+
+        final worldContext = limitedEntries.map((e) => e.content).join('\n\n');
         tokenBudget -= TokenEstimator.estimate(worldContext);
         if (tokenBudget > 0) {
           promptMessages.add(Message(
@@ -70,6 +80,70 @@ class BuildPrompt {
             createdAt: DateTime.now(),
           ));
         }
+      }
+    }
+
+    // 2.5 Dynamic Story States
+    final storyStatesResult = await storyStateRepository.getActiveStoryStates(chatId);
+    final activeStates = storyStatesResult.fold((_) => <StoryState>[], (list) => list);
+    if (activeStates.isNotEmpty) {
+      final characterStates = activeStates.where((s) => s.category == StoryStateCategory.character);
+      final locationStates = activeStates.where((s) => s.category == StoryStateCategory.location);
+      final eventStates = activeStates.where((s) => s.category == StoryStateCategory.event);
+      final relationshipStates = activeStates.where((s) => s.category == StoryStateCategory.relationship);
+      final tabooStates = activeStates.where((s) => s.category == StoryStateCategory.taboo);
+      final styleStates = activeStates.where((s) => s.category == StoryStateCategory.style);
+
+      final stateBuffer = StringBuffer();
+      stateBuffer.writeln('## Current Story & World States');
+
+      if (characterStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Character States');
+        for (final s in characterStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+      if (locationStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Location States');
+        for (final s in locationStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+      if (relationshipStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Character Relationships');
+        for (final s in relationshipStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+      if (eventStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Event States & Foreshadowing');
+        for (final s in eventStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+      if (tabooStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Taboos (Never do these)');
+        for (final s in tabooStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+      if (styleStates.isNotEmpty) {
+        stateBuffer.writeln('\n### Style Constraints');
+        for (final s in styleStates) {
+          stateBuffer.writeln('- ${s.content}');
+        }
+      }
+
+      final statesContext = stateBuffer.toString();
+      tokenBudget -= TokenEstimator.estimate(statesContext);
+      if (tokenBudget > 0) {
+        promptMessages.add(Message(
+          id: 'story_states_context',
+          chatId: '',
+          role: MessageRole.system,
+          content: statesContext,
+          createdAt: DateTime.now(),
+        ));
       }
     }
 

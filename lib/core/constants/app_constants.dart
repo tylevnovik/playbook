@@ -1,7 +1,7 @@
 class AppConstants {
   static const String appName = 'Playbook';
   static const String dbName = 'playbook.db';
-  static const int dbVersion = 2;
+  static const int dbVersion = 3;
 
   // Token limits (default, overridable per model)
   static const int defaultMaxContextTokens = 8000;

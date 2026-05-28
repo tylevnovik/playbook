@@ -68,15 +68,32 @@ class SendMessage {
             );
             final saveUserResult = await chatRepository.saveMessage(userMessage);
             return await saveUserResult.fold((failure) async => Left(failure), (_) async {
-              
+              String? currentSummary = chat.summary;
+              if (messages.length >= AppConstants.defaultSummaryThreshold &&
+                  (currentSummary == null || currentSummary.trim().isEmpty)) {
+                final summarizeResult = await llmRepository.summarize(
+                  messages: [...messages, userMessage],
+                  config: config,
+                );
+                await summarizeResult.fold(
+                  (_) async => null,
+                  (newSummary) async {
+                    currentSummary = newSummary;
+                    final updatedChat = chat.copyWith(summary: newSummary);
+                    await chatRepository.updateChat(updatedChat);
+                  },
+                );
+              }
+
               final promptMessagesResult = await buildPrompt(
+                chatId: chatId,
                 activeCharacter: activeCharacter,
                 allCharacters: allCharacters,
                 worldBookIds: chat.worldBookIds,
                 messages: [...messages, userMessage],
                 config: config,
                 username: username,
-                summary: null,
+                summary: currentSummary,
               );
 
               return await promptMessagesResult.fold((failure) async => Left(failure), (promptMessages) async {

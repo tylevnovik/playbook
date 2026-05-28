@@ -4,6 +4,7 @@ class Chat extends Equatable {
   final String id;
   final List<String> characterIds;
   final List<String> worldBookIds;
+  final String? summary;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -11,6 +12,7 @@ class Chat extends Equatable {
     required this.id,
     required this.characterIds,
     required this.worldBookIds,
+    this.summary,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -18,17 +20,19 @@ class Chat extends Equatable {
   Chat copyWith({
     List<String>? characterIds,
     List<String>? worldBookIds,
+    String? summary,
     DateTime? updatedAt,
   }) {
     return Chat(
       id: id,
       characterIds: characterIds ?? this.characterIds,
       worldBookIds: worldBookIds ?? this.worldBookIds,
+      summary: summary ?? this.summary,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   @override
-  List<Object?> get props => [id, characterIds, worldBookIds];
+  List<Object?> get props => [id, characterIds, worldBookIds, summary];
 }

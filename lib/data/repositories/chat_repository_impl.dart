@@ -122,13 +122,7 @@ class ChatRepositoryImpl implements ChatRepository {
       final chatMap = await _chatDao.getById(message.chatId);
       if (chatMap != null) {
         final chat = ChatModel.fromMap(chatMap);
-        final updatedChat = Chat(
-          id: chat.id,
-          characterIds: chat.characterIds,
-          worldBookIds: chat.worldBookIds,
-          createdAt: chat.createdAt,
-          updatedAt: DateTime.now(),
-        );
+        final updatedChat = chat.copyWith(updatedAt: DateTime.now());
         await _chatDao.update(chat.id, ChatModel.toMap(updatedChat));
       }
       

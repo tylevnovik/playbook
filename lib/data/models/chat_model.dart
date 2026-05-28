@@ -10,6 +10,7 @@ class ChatModel {
       worldBookIds: map['world_book_ids'] != null
           ? List<String>.from(map['world_book_ids'] as List)
           : [],
+      summary: map['summary'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
     );
@@ -20,6 +21,7 @@ class ChatModel {
       'id': chat.id,
       'character_ids': chat.characterIds,
       'world_book_ids': chat.worldBookIds,
+      'summary': chat.summary,
       'created_at': chat.createdAt.toIso8601String(),
       'updated_at': chat.updatedAt.toIso8601String(),
     };

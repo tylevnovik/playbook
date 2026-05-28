@@ -97,6 +97,7 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE chats (
         id TEXT PRIMARY KEY,
+        summary TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -182,6 +183,19 @@ class DatabaseService {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE story_states (
+        id TEXT PRIMARY KEY,
+        chat_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        target_id TEXT,
+        content TEXT NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Indexes
     await db.execute('CREATE INDEX idx_messages_chat ON messages(chat_id)');
     await db.execute('CREATE INDEX idx_messages_parent ON messages(parent_id)');
@@ -192,6 +206,7 @@ class DatabaseService {
     await db.execute('CREATE INDEX idx_chat_characters_character ON chat_characters(character_id)');
     await db.execute('CREATE INDEX idx_chat_world_books_chat ON chat_world_books(chat_id)');
     await db.execute('CREATE INDEX idx_character_world_books_char ON character_world_books(character_id)');
+    await db.execute('CREATE INDEX idx_story_states_chat ON story_states(chat_id)');
   }
 
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -316,6 +331,28 @@ class DatabaseService {
           WHERE role = 'assistant' AND sender_id IS NULL
         ''');
       }
+    }
+
+    if (oldVersion < 3) {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(chats)');
+      final hasSummary = tableInfo.any((column) => column['name'] == 'summary');
+      if (!hasSummary) {
+        await db.execute('ALTER TABLE chats ADD COLUMN summary TEXT');
+      }
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS story_states (
+          id TEXT PRIMARY KEY,
+          chat_id TEXT NOT NULL,
+          category TEXT NOT NULL,
+          target_id TEXT,
+          content TEXT NOT NULL,
+          is_active INTEGER DEFAULT 1,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_story_states_chat ON story_states(chat_id)');
     }
   }
 
