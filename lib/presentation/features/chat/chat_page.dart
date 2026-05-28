@@ -8,7 +8,7 @@ import '../../../domain/usecases/load_character.dart';
 import '../../../domain/usecases/manage_chat.dart';
 import '../../../domain/usecases/send_message.dart';
 import '../../../domain/repositories/story_state_repository.dart';
-import '../../common/widgets/desktop_character_sidebar.dart';
+import '../../common/widgets/desktop_chat_sidebar.dart';
 import '../../common/widgets/responsive_layout.dart';
 import '../../common/widgets/error_dialog.dart';
 import 'bloc/chat_bloc.dart';
@@ -241,7 +241,7 @@ class _ChatPageState extends State<ChatPage> {
     if (state is ChatLoading) {
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedChatId: widget.chatId),
+          DesktopChatSidebar(selectedChatId: widget.chatId),
           const Expanded(child: Center(child: CircularProgressIndicator())),
         ],
       );
@@ -250,7 +250,7 @@ class _ChatPageState extends State<ChatPage> {
     if (state is ChatError) {
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedChatId: widget.chatId),
+          DesktopChatSidebar(selectedChatId: widget.chatId),
           Expanded(
             child: Scaffold(
               appBar: AppBar(title: Text(loc.get('error'))),
@@ -277,7 +277,7 @@ class _ChatPageState extends State<ChatPage> {
 
       return Row(
         children: [
-          DesktopCharacterSidebar(selectedChatId: widget.chatId),
+          DesktopChatSidebar(selectedChatId: widget.chatId),
           Expanded(
             child: Scaffold(
               appBar: AppBar(
@@ -397,7 +397,7 @@ class _ChatPageState extends State<ChatPage> {
 
     return Row(
       children: [
-        DesktopCharacterSidebar(selectedChatId: widget.chatId),
+        DesktopChatSidebar(selectedChatId: widget.chatId),
         Expanded(child: Center(child: Text(loc.get('loading')))),
       ],
     );

@@ -1,19 +1,14 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
-import '../../../domain/repositories/character_repository.dart';
+import '../../../domain/entities/chat.dart';
 import '../../../domain/repositories/chat_repository.dart';
-import '../../common/widgets/desktop_character_sidebar.dart';
+import '../../common/widgets/desktop_chat_sidebar.dart';
 import '../../common/widgets/responsive_layout.dart';
 import 'bloc/home_bloc.dart';
-import 'widgets/character_card.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -27,53 +22,15 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class _HomeMobileView extends StatelessWidget {
+class _HomeMobileView extends StatefulWidget {
   const _HomeMobileView();
 
-  Future<void> _importCharacter(BuildContext context) async {
-    final loc = AppLocalizations.of(context)!;
+  @override
+  State<_HomeMobileView> createState() => _HomeMobileViewState();
+}
 
-    try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
-
-      final file = result.files.first;
-      final content = file.bytes != null
-          ? utf8.decode(file.bytes!)
-          : file.path != null
-          ? await File(file.path!).readAsString()
-          : throw Exception(loc.get('fileReadFailed'));
-
-      final importResult = await getIt<CharacterRepository>().importCharacter(
-        content,
-      );
-      if (!context.mounted) return;
-
-      importResult.fold(
-        (failure) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${loc.get('importCharacterFailed')}: ${failure.message}',
-            ),
-          ),
-        ),
-        (_) {
-          context.read<HomeBloc>().add(LoadCharacters());
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.get('importCharacterSuccess'))),
-          );
-        },
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.get('importCharacterFailed')}: $e')),
-      );
-    }
-  }
+class _HomeMobileViewState extends State<_HomeMobileView> {
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
@@ -82,126 +39,253 @@ class _HomeMobileView extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.get('appName')),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.upload_file_outlined),
-            tooltip: loc.get('importCharacter'),
-            onPressed: () => _importCharacter(context),
+        title: Text(loc.get('chats')),
+      ),
+      body: Column(
+        children: [
+          // 搜索框
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: loc.get('searchChats'),
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                });
+              },
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.book_outlined),
-            tooltip: loc.get('worldBooks'),
-            onPressed: () => context.push('/worldbook'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: loc.get('settings'),
-            onPressed: () => context.push('/settings'),
+          
+          Expanded(
+            child: BlocBuilder<HomeBloc, HomeState>(
+              builder: (context, state) {
+                if (state is HomeLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state is HomeError) {
+                  return Center(child: Text(state.message));
+                }
+                if (state is HomeLoaded) {
+                  final allChats = state.chats;
+
+                  // 过滤会话
+                  final chats = allChats.where((chat) {
+                    if (_searchQuery.trim().isEmpty) return true;
+                    final chatCharacters = state.characters
+                        .where((c) => chat.characterIds.contains(c.id))
+                        .toList();
+                    final nameMatch = chatCharacters.any((c) => c.name
+                        .toLowerCase()
+                        .contains(_searchQuery.toLowerCase()));
+                    final summaryMatch = chat.summary != null &&
+                        chat.summary!
+                            .toLowerCase()
+                            .contains(_searchQuery.toLowerCase());
+                    return nameMatch || summaryMatch;
+                  }).toList();
+
+                  if (chats.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.chat_bubble_outline,
+                            size: 64,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty ? '暂无会话' : '未匹配到会话',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          if (_searchQuery.isEmpty)
+                            Text(
+                              '点击右下方按钮发起新对话',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: chats.length,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemBuilder: (context, index) {
+                      final chat = chats[index];
+                      final chatCharacters = state.characters
+                          .where((c) => chat.characterIds.contains(c.id))
+                          .toList();
+
+                      String displayName = '未命名会话';
+                      String? displayAvatar;
+                      if (chatCharacters.isNotEmpty) {
+                        if (chatCharacters.length == 1) {
+                          displayName = chatCharacters.first.name;
+                          displayAvatar = chatCharacters.first.avatarPath;
+                        } else {
+                          displayName = chatCharacters.map((c) => c.name).join(', ');
+                          displayAvatar = chatCharacters.first.avatarPath;
+                        }
+                      }
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: theme.colorScheme.primaryContainer,
+                            backgroundImage: displayAvatar != null && displayAvatar.isNotEmpty
+                                ? NetworkImage(displayAvatar)
+                                : null,
+                            child: displayAvatar == null || displayAvatar.isEmpty
+                                ? Text(
+                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            chat.summary ??
+                                (chatCharacters.length > 1
+                                    ? '群聊 (${chatCharacters.length}个角色)'
+                                    : (chatCharacters.isNotEmpty
+                                        ? chatCharacters.first.description
+                                        : '无参与角色')),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onTap: () => context.push('/chat/${chat.id}'),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _confirmDelete(context, chat, displayName),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ),
         ],
       ),
-      body: BlocBuilder<HomeBloc, HomeState>(
-        builder: (context, state) {
-          if (state is HomeLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state is HomeError) {
-            return Center(child: Text(state.message));
-          }
-          if (state is HomeLoaded) {
-            if (state.characters.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.people_outline,
-                      size: 64,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      loc.get('noCharacters'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      loc.get('tapToCreate'),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.auto_awesome_outlined),
-                      label: Text(loc.get('addExampleCharacters')),
-                      onPressed: () {
-                        context.read<HomeBloc>().add(CreateExampleCharacters());
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(loc.get('examplesAdded'))),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 200,
-                childAspectRatio: 0.75,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: state.characters.length,
-              itemBuilder: (context, index) {
-                final character = state.characters[index];
-                return CharacterCard(
-                  character: character,
-                  onTap: () async {
-                    final existingChatIndex = state.chats.indexWhere((chat) =>
-                        chat.characterIds.length == 1 &&
-                        chat.characterIds.first == character.id);
-                    if (existingChatIndex != -1) {
-                      final chatId = state.chats[existingChatIndex].id;
-                      if (context.mounted) {
-                        context.push('/chat/$chatId');
-                      }
-                    } else {
-                      final chatResult = await getIt<ChatRepository>().createChat(
-                        characterIds: [character.id],
-                      );
-                      if (context.mounted) {
-                        chatResult.fold(
-                          (failure) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('创建会话失败: ${failure.message}')),
-                            );
-                          },
-                          (newChat) {
-                            context.read<HomeBloc>().add(LoadCharacters());
-                            context.push('/chat/${newChat.id}');
-                          },
-                        );
-                      }
-                    }
-                  },
-                  onEdit: () {
-                    context.push('/character/${character.id}');
-                  },
-                  onDelete: () {
-                    context.read<HomeBloc>().add(DeleteCharacter(character.id));
-                  },
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateChatDialog(context),
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  void _showCreateChatDialog(BuildContext context) {
+    final homeState = context.read<HomeBloc>().state;
+    if (homeState is! HomeLoaded) return;
+
+    final loc = AppLocalizations.of(context)!;
+    final characters = homeState.characters;
+
+    if (characters.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.get('createChat')),
+          content: Text(loc.get('noCharactersToChat')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(loc.get('cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/characters');
+              },
+              child: Text(loc.get('characters')),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return CharacterSelectDialog(
+          characters: characters,
+          onSelected: (selectedIds) async {
+            final result = await getIt<ChatRepository>().createChat(
+              characterIds: selectedIds,
+            );
+            if (!context.mounted) return;
+            result.fold(
+              (failure) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('创建会话失败: ${failure.message}')),
                 );
               },
+              (chat) {
+                context.read<HomeBloc>().add(LoadCharacters());
+                context.push('/chat/${chat.id}');
+              },
             );
-          }
-          return const SizedBox.shrink();
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/character/new'),
-        child: const Icon(Icons.add),
+          },
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, Chat chat, String name) {
+    final loc = AppLocalizations.of(context)!;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.get('deleteChat')),
+        content: Text(loc.get('confirmDeleteChat')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(loc.get('cancel')),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final result = await getIt<ChatRepository>().deleteChat(chat.id);
+              result.fold(
+                (failure) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('删除会话失败: ${failure.message}')),
+                  );
+                },
+                (_) {
+                  context.read<HomeBloc>().add(LoadCharacters());
+                },
+              );
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: Text(loc.get('delete')),
+          ),
+        ],
       ),
     );
   }
@@ -217,7 +301,7 @@ class _HomeDesktopView extends StatelessWidget {
 
     return Row(
       children: [
-        const DesktopCharacterSidebar(),
+        const DesktopChatSidebar(),
         Expanded(
           child: Container(
             color: theme.colorScheme.surfaceContainerHigh,
@@ -247,7 +331,7 @@ class _HomeDesktopView extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    loc.get('welcomeSubtitle'),
+                    '选择左侧会话开始聊天，或者点击下方按钮发起新对话。',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
@@ -255,9 +339,9 @@ class _HomeDesktopView extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: Text(loc.get('createCharacter')),
-                    onPressed: () => context.push('/character/new'),
+                    icon: const Icon(Icons.add_comment),
+                    label: Text(loc.get('createChat')),
+                    onPressed: () => _showCreateChatDialog(context),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -265,23 +349,70 @@ class _HomeDesktopView extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: Text(loc.get('addExampleCharacters')),
-                    onPressed: () {
-                      context.read<HomeBloc>().add(CreateExampleCharacters());
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(loc.get('examplesAdded'))),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showCreateChatDialog(BuildContext context) {
+    final homeState = context.read<HomeBloc>().state;
+    if (homeState is! HomeLoaded) return;
+
+    final loc = AppLocalizations.of(context)!;
+    final characters = homeState.characters;
+
+    if (characters.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.get('createChat')),
+          content: Text(loc.get('noCharactersToChat')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(loc.get('cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/characters');
+              },
+              child: Text(loc.get('characters')),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return CharacterSelectDialog(
+          characters: characters,
+          onSelected: (selectedIds) async {
+            final result = await getIt<ChatRepository>().createChat(
+              characterIds: selectedIds,
+            );
+            if (!context.mounted) return;
+            result.fold(
+              (failure) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('创建会话失败: ${failure.message}')),
+                );
+              },
+              (chat) {
+                context.read<HomeBloc>().add(LoadCharacters());
+                context.go('/chat/${chat.id}');
+              },
+            );
+          },
+        );
+      },
     );
   }
 }

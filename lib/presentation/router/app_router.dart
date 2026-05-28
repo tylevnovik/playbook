@@ -5,6 +5,7 @@ import '../common/widgets/offline_banner.dart';
 import '../common/widgets/responsive_layout.dart';
 import '../features/home/home_page.dart';
 import '../features/character/character_edit_page.dart';
+import '../features/character/character_list_page.dart';
 import '../features/chat/chat_page.dart';
 import '../features/worldbook/world_book_page.dart';
 import '../features/settings/settings_page.dart';
@@ -27,6 +28,10 @@ class AppRouter {
         },
         routes: [
           GoRoute(path: '/', builder: (context, state) => const HomePage()),
+          GoRoute(
+            path: '/characters',
+            builder: (context, state) => const CharacterListPage(),
+          ),
           GoRoute(
             path: '/character/new',
             builder: (context, state) => const CharacterEditPage(),
@@ -65,8 +70,9 @@ class AppRouter {
   );
 
   static int _selectedIndexFor(String location) {
-    if (location.startsWith('/worldbook')) return 1;
-    if (location.startsWith('/settings')) return 2;
+    if (location.startsWith('/characters')) return 1;
+    if (location.startsWith('/worldbook')) return 2;
+    if (location.startsWith('/settings')) return 3;
     return 0;
   }
 }

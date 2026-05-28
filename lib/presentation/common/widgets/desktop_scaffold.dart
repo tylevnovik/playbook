@@ -31,9 +31,12 @@ class DesktopScaffold extends StatelessWidget {
                   context.go('/');
                   break;
                 case 1:
-                  context.go('/worldbook');
+                  context.go('/characters');
                   break;
                 case 2:
+                  context.go('/worldbook');
+                  break;
+                case 3:
                   context.go('/settings');
                   break;
               }
@@ -91,6 +94,11 @@ class DesktopScaffold extends StatelessWidget {
                 label: Text(loc.get('chats')),
               ),
               NavigationRailDestination(
+                icon: const Icon(Icons.people_outline),
+                selectedIcon: const Icon(Icons.people),
+                label: Text(loc.get('characters')),
+              ),
+              NavigationRailDestination(
                 icon: const Icon(Icons.auto_stories_outlined),
                 selectedIcon: const Icon(Icons.auto_stories),
                 label: Text(loc.get('worldBooks')),
@@ -101,8 +109,7 @@ class DesktopScaffold extends StatelessWidget {
                 label: Text(loc.get('settings')),
               ),
             ],
-          ),
-          VerticalDivider(
+          ),          VerticalDivider(
             thickness: 1,
             width: 1,
             color: theme.colorScheme.outlineVariant,
