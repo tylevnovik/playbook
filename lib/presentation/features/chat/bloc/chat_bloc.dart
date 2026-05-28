@@ -3,8 +3,11 @@ import '../../../../domain/entities/character.dart';
 import '../../../../domain/entities/chat.dart';
 import '../../../../domain/entities/message.dart';
 import '../../../../domain/entities/world_book.dart';
+import '../../../../domain/entities/story_state.dart';
 import '../../../../domain/repositories/world_book_repository.dart';
+import '../../../../domain/repositories/story_state_repository.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/id_generator.dart';
 import '../../../../domain/usecases/load_character.dart';
 import '../../../../domain/usecases/manage_chat.dart';
 import '../../../../domain/usecases/send_message.dart';
@@ -15,11 +18,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final LoadCharacter loadCharacter;
   final ManageChat manageChat;
   final SendMessage sendMessage;
+  final StoryStateRepository storyStateRepository;
 
   ChatBloc({
     required this.loadCharacter,
     required this.manageChat,
     required this.sendMessage,
+    required this.storyStateRepository,
   }) : super(ChatInitial()) {
     on<LoadChat>(_onLoadChat);
     on<SendChatMessage>(_onSendChatMessage);
@@ -28,6 +33,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<UpdateChatCharacters>(_onUpdateChatCharacters);
     on<UpdateChatWorldBooks>(_onUpdateChatWorldBooks);
     on<SetActiveCharacter>(_onSetActiveCharacter);
+    on<AddStoryState>(_onAddStoryState);
+    on<UpdateStoryStateEvent>(_onUpdateStoryState);
+    on<DeleteStoryStateEvent>(_onDeleteStoryState);
   }
 
   Future<void> _onLoadChat(LoadChat event, Emitter<ChatState> emit) async {
@@ -83,6 +91,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           wbResult.fold((_) => null, (wb) => worldBooks.add(wb));
         }
 
+        final storyStatesResult = await storyStateRepository.getStoryStates(chat.id);
+        final storyStates = storyStatesResult.fold((_) => <StoryState>[], (list) => list);
+
         final allMessagesResult = await manageChat.getMessages(chat.id);
         allMessagesResult.fold((failure) => emit(ChatError(failure.message)), (
           allMsgs,
@@ -110,6 +121,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
                   ? messages.last.id
                   : null,
               activeCharacterId: activeCharId,
+              storyStates: storyStates,
             ),
           );
         });
@@ -296,6 +308,82 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     final currentState = state;
     if (currentState is ChatLoaded) {
       emit(currentState.copyWith(activeCharacterId: event.characterId));
+    }
+  }
+
+  Future<void> _onAddStoryState(
+    AddStoryState event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      final newState = StoryState(
+        id: IdGenerator.generate(),
+        chatId: currentState.chat.id,
+        category: event.category,
+        targetId: event.targetId,
+        content: event.content,
+        isActive: true,
+        updatedAt: DateTime.now(),
+      );
+      final result = await storyStateRepository.addStoryState(newState);
+      await result.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (_) async {
+          await _loadMessagesAndBranches(
+            currentState.characters,
+            currentState.chat,
+            currentState.activeCharacterId,
+            currentState.currentLeafMessageId,
+            emit,
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _onUpdateStoryState(
+    UpdateStoryStateEvent event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      final updated = event.state.copyWith(updatedAt: DateTime.now());
+      final result = await storyStateRepository.updateStoryState(updated);
+      await result.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (_) async {
+          await _loadMessagesAndBranches(
+            currentState.characters,
+            currentState.chat,
+            currentState.activeCharacterId,
+            currentState.currentLeafMessageId,
+            emit,
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _onDeleteStoryState(
+    DeleteStoryStateEvent event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      final result = await storyStateRepository.deleteStoryState(event.id);
+      await result.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (_) async {
+          await _loadMessagesAndBranches(
+            currentState.characters,
+            currentState.chat,
+            currentState.activeCharacterId,
+            currentState.currentLeafMessageId,
+            emit,
+          );
+        },
+      );
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../../domain/entities/message.dart';
+import '../../../../domain/entities/story_state.dart';
 
 abstract class ChatEvent extends Equatable {
   @override
@@ -55,4 +56,27 @@ class SetActiveCharacter extends ChatEvent {
   SetActiveCharacter(this.characterId);
   @override
   List<Object?> get props => [characterId];
+}
+
+class AddStoryState extends ChatEvent {
+  final StoryStateCategory category;
+  final String? targetId;
+  final String content;
+  AddStoryState({required this.category, this.targetId, required this.content});
+  @override
+  List<Object?> get props => [category, targetId, content];
+}
+
+class UpdateStoryStateEvent extends ChatEvent {
+  final StoryState state;
+  UpdateStoryStateEvent(this.state);
+  @override
+  List<Object?> get props => [state];
+}
+
+class DeleteStoryStateEvent extends ChatEvent {
+  final String id;
+  DeleteStoryStateEvent(this.id);
+  @override
+  List<Object?> get props => [id];
 }

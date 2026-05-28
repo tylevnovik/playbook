@@ -7,6 +7,7 @@ import '../../../domain/entities/message.dart';
 import '../../../domain/usecases/load_character.dart';
 import '../../../domain/usecases/manage_chat.dart';
 import '../../../domain/usecases/send_message.dart';
+import '../../../domain/repositories/story_state_repository.dart';
 import '../../common/widgets/desktop_character_sidebar.dart';
 import '../../common/widgets/responsive_layout.dart';
 import '../../common/widgets/error_dialog.dart';
@@ -57,6 +58,7 @@ class _ChatPageState extends State<ChatPage> {
         loadCharacter: getIt<LoadCharacter>(),
         manageChat: getIt<ManageChat>(),
         sendMessage: getIt<SendMessage>(),
+        storyStateRepository: getIt<StoryStateRepository>(),
       )..add(LoadChat(chatId: widget.chatId)),
       child: BlocConsumer<ChatBloc, ChatState>(
         listener: (context, state) {
@@ -164,6 +166,16 @@ class _ChatPageState extends State<ChatPage> {
           allAvailableWorldBooks: state.allAvailableWorldBooks,
           onWorldBooksChanged: (newIds) {
             context.read<ChatBloc>().add(UpdateChatWorldBooks(newIds));
+          },
+          storyStates: state.storyStates,
+          onAddStoryState: (category, content) {
+            context.read<ChatBloc>().add(AddStoryState(category: category, content: content));
+          },
+          onUpdateStoryState: (storyState) {
+            context.read<ChatBloc>().add(UpdateStoryStateEvent(storyState));
+          },
+          onDeleteStoryState: (id) {
+            context.read<ChatBloc>().add(DeleteStoryStateEvent(id));
           },
         ),
         body: Column(
@@ -341,6 +353,16 @@ class _ChatPageState extends State<ChatPage> {
                 allAvailableWorldBooks: state.allAvailableWorldBooks,
                 onWorldBooksChanged: (newIds) {
                   context.read<ChatBloc>().add(UpdateChatWorldBooks(newIds));
+                },
+                storyStates: state.storyStates,
+                onAddStoryState: (category, content) {
+                  context.read<ChatBloc>().add(AddStoryState(category: category, content: content));
+                },
+                onUpdateStoryState: (storyState) {
+                  context.read<ChatBloc>().add(UpdateStoryStateEvent(storyState));
+                },
+                onDeleteStoryState: (id) {
+                  context.read<ChatBloc>().add(DeleteStoryStateEvent(id));
                 },
               ),
               body: Column(

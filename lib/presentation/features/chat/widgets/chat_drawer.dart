@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../domain/entities/character.dart';
 import '../../../../domain/entities/world_book.dart';
+import '../../../../domain/entities/story_state.dart';
 
 class ChatDrawer extends StatefulWidget {
   final double initialTemperature;
@@ -16,6 +17,11 @@ class ChatDrawer extends StatefulWidget {
   final List<WorldBook> allAvailableWorldBooks;
   final Function(List<String>) onWorldBooksChanged;
 
+  final List<StoryState> storyStates;
+  final Function(StoryStateCategory, String) onAddStoryState;
+  final Function(StoryState) onUpdateStoryState;
+  final Function(String) onDeleteStoryState;
+
   const ChatDrawer({
     super.key,
     required this.initialTemperature,
@@ -28,6 +34,10 @@ class ChatDrawer extends StatefulWidget {
     required this.selectedWorldBookIds,
     required this.allAvailableWorldBooks,
     required this.onWorldBooksChanged,
+    required this.storyStates,
+    required this.onAddStoryState,
+    required this.onUpdateStoryState,
+    required this.onDeleteStoryState,
   });
 
   @override
@@ -213,9 +223,241 @@ class _ChatDrawerState extends State<ChatDrawer> {
                       );
                     }).toList(),
                   ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '故事状态与追踪',
+                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  tooltip: '添加故事状态',
+                  onPressed: () => _showAddStoryStateDialog(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            widget.storyStates.isEmpty
+                ? Text(
+                    '暂无故事状态/约束设定',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  )
+                : Column(
+                    children: widget.storyStates.map((state) {
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Chip(
+                                    label: Text(
+                                      _categoryLabel(state.category),
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const Spacer(),
+                                  Switch(
+                                    value: state.isActive,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    onChanged: (val) {
+                                      widget.onUpdateStoryState(state.copyWith(isActive: val));
+                                    },
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 16),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => _showEditStoryStateDialog(context, state),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline, size: 16),
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () => widget.onDeleteStoryState(state.id),
+                                  ),
+                                ],
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0, left: 4.0),
+                                child: Text(
+                                  state.content,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    decoration: state.isActive ? null : TextDecoration.lineThrough,
+                                    color: state.isActive ? null : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
           ],
         ),
       ),
+    );
+  }
+
+  String _categoryLabel(StoryStateCategory cat) {
+    switch (cat) {
+      case StoryStateCategory.character:
+        return '人物状态';
+      case StoryStateCategory.location:
+        return '地点状态';
+      case StoryStateCategory.event:
+        return '事件/伏笔';
+      case StoryStateCategory.relationship:
+        return '角色关系';
+      case StoryStateCategory.taboo:
+        return '写作禁忌';
+      case StoryStateCategory.style:
+        return '风格约束';
+    }
+  }
+
+  void _showAddStoryStateDialog(BuildContext context) {
+    StoryStateCategory selectedCategory = StoryStateCategory.event;
+    final contentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('添加故事状态/线索'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<StoryStateCategory>(
+                    initialValue: selectedCategory,
+                    decoration: const InputDecoration(labelText: '状态类别'),
+                    items: StoryStateCategory.values.map((cat) {
+                      return DropdownMenuItem(
+                        value: cat,
+                        child: Text(_categoryLabel(cat)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedCategory = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: contentController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '状态描述 / 规则约束',
+                      border: OutlineInputBorder(),
+                      hintText: '描述具体线索、角色现状、伏笔、或 AI 生成时的写作禁忌。',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final text = contentController.text.trim();
+                    if (text.isNotEmpty) {
+                      widget.onAddStoryState(selectedCategory, text);
+                    }
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('添加'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditStoryStateDialog(BuildContext context, StoryState state) {
+    StoryStateCategory selectedCategory = state.category;
+    final contentController = TextEditingController(text: state.content);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('编辑故事状态/线索'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<StoryStateCategory>(
+                    initialValue: selectedCategory,
+                    decoration: const InputDecoration(labelText: '状态类别'),
+                    items: StoryStateCategory.values.map((cat) {
+                      return DropdownMenuItem(
+                        value: cat,
+                        child: Text(_categoryLabel(cat)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          selectedCategory = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: contentController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: '状态描述 / 规则约束',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final text = contentController.text.trim();
+                    if (text.isNotEmpty) {
+                      widget.onUpdateStoryState(
+                        state.copyWith(
+                          category: selectedCategory,
+                          content: text,
+                        ),
+                      );
+                    }
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -29,6 +29,8 @@ class StoryState extends Equatable {
   });
 
   StoryState copyWith({
+    StoryStateCategory? category,
+    String? targetId,
     String? content,
     bool? isActive,
     DateTime? updatedAt,
@@ -36,8 +38,8 @@ class StoryState extends Equatable {
     return StoryState(
       id: id,
       chatId: chatId,
-      category: category,
-      targetId: targetId,
+      category: category ?? this.category,
+      targetId: targetId ?? this.targetId,
       content: content ?? this.content,
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,

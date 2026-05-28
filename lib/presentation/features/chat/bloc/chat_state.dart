@@ -3,6 +3,7 @@ import '../../../../domain/entities/character.dart';
 import '../../../../domain/entities/chat.dart';
 import '../../../../domain/entities/message.dart';
 import '../../../../domain/entities/world_book.dart';
+import '../../../../domain/entities/story_state.dart';
 
 abstract class ChatState extends Equatable {
   @override
@@ -21,6 +22,7 @@ class ChatLoaded extends ChatState {
   final Map<String, List<Message>> branches; // Maps parentId to children
   final String? currentLeafMessageId;
   final String? activeCharacterId;
+  final List<StoryState> storyStates;
 
   ChatLoaded({
     required this.characters,
@@ -32,6 +34,7 @@ class ChatLoaded extends ChatState {
     required this.branches,
     this.currentLeafMessageId,
     this.activeCharacterId,
+    this.storyStates = const [],
   });
 
   ChatLoaded copyWith({
@@ -44,6 +47,7 @@ class ChatLoaded extends ChatState {
     Map<String, List<Message>>? branches,
     String? currentLeafMessageId,
     String? activeCharacterId,
+    List<StoryState>? storyStates,
   }) {
     return ChatLoaded(
       characters: characters ?? this.characters,
@@ -55,6 +59,7 @@ class ChatLoaded extends ChatState {
       branches: branches ?? this.branches,
       currentLeafMessageId: currentLeafMessageId ?? this.currentLeafMessageId,
       activeCharacterId: activeCharacterId ?? this.activeCharacterId,
+      storyStates: storyStates ?? this.storyStates,
     );
   }
 
@@ -68,7 +73,8 @@ class ChatLoaded extends ChatState {
         messages,
         branches,
         currentLeafMessageId,
-        activeCharacterId
+        activeCharacterId,
+        storyStates,
       ];
 }
 class ChatError extends ChatState {
