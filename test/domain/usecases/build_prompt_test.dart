@@ -157,7 +157,7 @@ void main() {
       (failure) => fail('Should not return failure'),
       (promptMessages) {
         final systemMsg = promptMessages.firstWhere((m) => m.id == 'system');
-        expect(systemMsg.content, contains("The user's name is Alice"));
+        expect(systemMsg.content, contains("The user is named Alice"));
         expect(systemMsg.content, contains("The user's description/role is: A brave adventurer looking for gold."));
       },
     );
