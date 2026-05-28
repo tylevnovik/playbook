@@ -27,7 +27,6 @@ class _CharacterListPageState extends State<CharacterListPage> {
   String _searchQuery = '';
   Character? _selectedCharacter;
   List<WorldBook> _worldBooks = [];
-  bool _isLoadingWorldBooks = true;
 
   @override
   void initState() {
@@ -42,14 +41,11 @@ class _CharacterListPageState extends State<CharacterListPage> {
   Future<void> _loadWorldBooks() async {
     final result = await getIt<WorldBookRepository>().getAllWorldBooks();
     result.fold(
-      (failure) {
-        if (mounted) setState(() => _isLoadingWorldBooks = false);
-      },
+      (failure) {},
       (books) {
         if (mounted) {
           setState(() {
             _worldBooks = books;
-            _isLoadingWorldBooks = false;
           });
         }
       },
@@ -216,7 +212,7 @@ class _CharacterListPageState extends State<CharacterListPage> {
               tooltip: loc.get('createCharacter'),
               onPressed: () async {
                 await context.push('/character/new');
-                if (mounted) {
+                if (context.mounted) {
                   context.read<HomeBloc>().add(LoadCharacters());
                 }
               },
@@ -259,7 +255,7 @@ class _CharacterListPageState extends State<CharacterListPage> {
           : FloatingActionButton.extended(
               onPressed: () async {
                 await context.push('/character/new');
-                if (mounted) {
+                if (context.mounted) {
                   context.read<HomeBloc>().add(LoadCharacters());
                 }
               },
@@ -816,7 +812,7 @@ class _CharacterListPageState extends State<CharacterListPage> {
                           onPressed: () async {
                             Navigator.pop(ctx);
                             await context.push('/character/${char.id}');
-                            if (mounted) {
+                            if (context.mounted) {
                               context.read<HomeBloc>().add(LoadCharacters());
                             }
                           },
