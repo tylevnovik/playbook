@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:collection/collection.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../domain/entities/message.dart';
@@ -17,7 +18,6 @@ import 'bloc/chat_state.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/chat_drawer.dart';
-import 'widgets/worldview_extractor_dialog.dart';
 
 class ChatPage extends StatefulWidget {
   final String chatId;
@@ -141,7 +141,7 @@ class _ChatPageState extends State<ChatPage> {
             IconButton(
               icon: const Icon(Icons.psychology),
               tooltip: 'AI 世界设定提取',
-              onPressed: () => _showWorldviewExtractorDialog(context, state),
+              onPressed: () => context.go('/extractor?chatId=${widget.chatId}'),
             ),
             Builder(
               builder: (context) => IconButton(
@@ -209,7 +209,9 @@ class _ChatPageState extends State<ChatPage> {
             if (state.characters.length > 1) _buildCharacterSwitcher(context, state),
             ChatInput(
               isSending: state is ChatLoading,
-              onSend: (text, attachments) {
+              allAvailableCharacters: state.allAvailableCharacters,
+              username: state.username,
+              onSend: (text, attachments, senderId) {
                 final attachmentEntities = attachments
                     .map(
                       (path) =>
@@ -222,6 +224,7 @@ class _ChatPageState extends State<ChatPage> {
                     attachments: attachmentEntities.isEmpty
                         ? null
                         : attachmentEntities,
+                    senderId: senderId,
                   ),
                 );
               },
@@ -299,7 +302,7 @@ class _ChatPageState extends State<ChatPage> {
                   IconButton(
                     icon: const Icon(Icons.psychology),
                     tooltip: 'AI 世界设定提取',
-                    onPressed: () => _showWorldviewExtractorDialog(context, state),
+                    onPressed: () => context.go('/extractor?chatId=${widget.chatId}'),
                   ),
                   Builder(
                     builder: (context) => IconButton(
@@ -368,7 +371,9 @@ class _ChatPageState extends State<ChatPage> {
                   if (state.characters.length > 1) _buildCharacterSwitcher(context, state),
                   ChatInput(
                     isSending: state is ChatLoading,
-                    onSend: (text, attachments) {
+                    allAvailableCharacters: state.allAvailableCharacters,
+                    username: state.username,
+                    onSend: (text, attachments, senderId) {
                       final attachmentEntities = attachments
                           .map(
                             (path) => MessageAttachment(
@@ -383,6 +388,7 @@ class _ChatPageState extends State<ChatPage> {
                           attachments: attachmentEntities.isEmpty
                               ? null
                               : attachmentEntities,
+                          senderId: senderId,
                         ),
                       );
                     },
@@ -446,17 +452,7 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  void _showWorldviewExtractorDialog(BuildContext context, ChatLoaded state) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return WorldviewExtractorDialog(
-          chatState: state,
-          chatBloc: context.read<ChatBloc>(),
-        );
-      },
-    );
-  }
+
 
   void _showExtractToWorldBookDialog(BuildContext context, ChatLoaded state, String text) {
     final nameController = TextEditingController(
@@ -594,7 +590,8 @@ class _ChatPageState extends State<ChatPage> {
       characterAvatar: charAvatar,
       branchCount: branchCount,
       currentBranchIndex: currentBranchIndex,
-      availableCharacters: state.characters,
+      availableCharacters: state.allAvailableCharacters,
+      username: state.username,
       onPreviousBranch: () {
         context.read<ChatBloc>().add(SwitchToSiblingBranch(msg.id, next: false));
       },

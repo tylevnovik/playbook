@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/localization/app_localizations.dart';
 import '../../../core/utils/file_saver/file_saver.dart';
@@ -343,6 +344,11 @@ class _WorldBookPageState extends State<WorldBookPage> {
           title: Text(loc.get('worldBooks')),
           actions: [
             IconButton(
+              icon: const Icon(Icons.psychology_outlined),
+              tooltip: 'AI 设定提取',
+              onPressed: () => context.go('/extractor'),
+            ),
+            IconButton(
               icon: const Icon(Icons.upload_file_outlined),
               tooltip: loc.get('importWorldBook'),
               onPressed: () => _importWorldBook(context, bloc),
@@ -511,6 +517,11 @@ class _WorldBookPageState extends State<WorldBookPage> {
         title: Text(loc.get('worldBooks')),
         actions: [
           IconButton(
+            icon: const Icon(Icons.psychology_outlined),
+            tooltip: 'AI 设定提取',
+            onPressed: () => context.go('/extractor'),
+          ),
+          IconButton(
             icon: const Icon(Icons.upload_file_outlined),
             tooltip: loc.get('importWorldBook'),
             onPressed: () => _importWorldBook(context, bloc),
@@ -568,6 +579,11 @@ class _WorldBookPageState extends State<WorldBookPage> {
       appBar: AppBar(
         title: Text(loc.get('worldBooks')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.psychology_outlined),
+            tooltip: 'AI 设定提取',
+            onPressed: () => context.go('/extractor'),
+          ),
           IconButton(
             icon: const Icon(Icons.upload_file_outlined),
             tooltip: loc.get('importWorldBook'),

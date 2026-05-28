@@ -23,6 +23,7 @@ class ChatLoaded extends ChatState {
   final String? currentLeafMessageId;
   final String? activeCharacterId;
   final List<StoryState> storyStates;
+  final String username;
 
   ChatLoaded({
     required this.characters,
@@ -35,6 +36,7 @@ class ChatLoaded extends ChatState {
     this.currentLeafMessageId,
     this.activeCharacterId,
     this.storyStates = const [],
+    this.username = 'User',
   });
 
   ChatLoaded copyWith({
@@ -48,6 +50,7 @@ class ChatLoaded extends ChatState {
     String? currentLeafMessageId,
     String? activeCharacterId,
     List<StoryState>? storyStates,
+    String? username,
   }) {
     return ChatLoaded(
       characters: characters ?? this.characters,
@@ -60,6 +63,7 @@ class ChatLoaded extends ChatState {
       currentLeafMessageId: currentLeafMessageId ?? this.currentLeafMessageId,
       activeCharacterId: activeCharacterId ?? this.activeCharacterId,
       storyStates: storyStates ?? this.storyStates,
+      username: username ?? this.username,
     );
   }
 
@@ -75,6 +79,7 @@ class ChatLoaded extends ChatState {
         currentLeafMessageId,
         activeCharacterId,
         storyStates,
+        username,
       ];
 }
 class ChatError extends ChatState {

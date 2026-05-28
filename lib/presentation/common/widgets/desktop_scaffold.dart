@@ -37,6 +37,9 @@ class DesktopScaffold extends StatelessWidget {
                   context.go('/worldbook');
                   break;
                 case 3:
+                  context.go('/extractor');
+                  break;
+                case 4:
                   context.go('/settings');
                   break;
               }
@@ -102,6 +105,11 @@ class DesktopScaffold extends StatelessWidget {
                 icon: const Icon(Icons.auto_stories_outlined),
                 selectedIcon: const Icon(Icons.auto_stories),
                 label: Text(loc.get('worldBooks')),
+              ),
+              NavigationRailDestination(
+                icon: const Icon(Icons.psychology_outlined),
+                selectedIcon: const Icon(Icons.psychology),
+                label: Text(loc.get('aiExtractor')),
               ),
               NavigationRailDestination(
                 icon: const Icon(Icons.settings_outlined),

@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:collection/collection.dart';
 import '../../core/error/failures.dart';
 import '../../core/utils/token_estimator.dart';
 import '../entities/character.dart';
@@ -27,6 +28,7 @@ class BuildPrompt {
     String? username,
     String? userDescription,
     String? summary,
+    List<Character> allAvailableCharacters = const [],
   }) async {
     final promptMessages = <Message>[];
     int tokenBudget = config.contextWindow - config.maxTokens;
@@ -164,11 +166,30 @@ class BuildPrompt {
 
     // 4. Recent messages (fit as many as budget allows)
     final recentMessages = messages.reversed.take(config.contextWindow ~/ 200).toList().reversed;
+    final userName = username ?? 'User';
     for (final msg in recentMessages) {
       final msgTokens = TokenEstimator.estimate(msg.content);
       if (tokenBudget - msgTokens < 0) break;
       tokenBudget -= msgTokens;
-      promptMessages.add(msg);
+
+      // Format with speaker prefix so the LLM knows who is speaking
+      String prefix = '';
+      if (msg.senderId == 'dm') {
+        prefix = '[DM]';
+      } else if (msg.senderId != null) {
+        final char = allCharacters.firstWhereOrNull((c) => c.id == msg.senderId) ??
+            allAvailableCharacters.firstWhereOrNull((c) => c.id == msg.senderId);
+        if (char != null) {
+          prefix = '[${char.name}]';
+        } else {
+          prefix = '[Character]';
+        }
+      } else {
+        prefix = '[$userName]';
+      }
+
+      final formattedContent = msg.content.trim().startsWith('[') ? msg.content : '$prefix: ${msg.content}';
+      promptMessages.add(msg.copyWith(content: formattedContent));
     }
 
     return Right(promptMessages);
@@ -189,20 +210,26 @@ class BuildPrompt {
         ? '\n## Other Characters in this Group Chat\n${otherChars.map((c) => '- Name: ${c.name}\n  Description: ${c.description}').join('\n')}'
         : '';
     
-    return '''You are ${activeCharacter.name}. Stay in character at all times.
-
-## Character Description
-${activeCharacter.description}
+    return '''You are a group chat roleplay orchestrator and narrator (DM).
+Stay in character at all times. You can write narrations or describe scenes as [DM], and speak/act as any of the characters in the group chat:
+- Name: ${activeCharacter.name} (Primary character)
+  Description: ${activeCharacter.description}
 $otherCharsPrompt
 
 $customPrompt
 
-## Rules
-- Never break character
-- Never refer to yourself as an AI or language model
-- Respond as ${activeCharacter.name} would, based on the character description
-- Use * for actions, " for dialogue
-- Keep responses engaging and in-character
-- The user's name is $userName${userDesc.isNotEmpty ? '\n- The user\'s description/role is: $userDesc' : ''}''';
+## Critical Multi-Character / DM Rules
+1. When generating a response, you can output dialogue/actions for characters, or scene narration as [DM].
+2. Every block of content you output MUST start with a speaker label in brackets at the beginning of a line:
+   - Use `[DM]: narration` for environment/scene description or action outcome.
+   - Use `[Character Name]: content` for character dialogue and actions (e.g. `[${activeCharacter.name}]: ...`).
+   Example:
+   [DM]: Carter nods slowly.
+   [${activeCharacter.name}]: "Who goes there?"
+3. Not all characters must speak in every turn. Only generate output for characters who have something meaningful to say or react to in this context. If no character needs to speak, just use [DM] to describe the scene.
+4. The user is named $userName. The user can also roleplay/speak as characters or as [DM]. Pay attention to who is speaking based on their `[Name]:` prefix in the history.
+5. Do not include any meta-commentary, explanations, or quotes around the whole block. Only output the speaker-prefixed lines. Keep the tone engaging and atmospheric.
+
+The user's description/role is: $userDesc''';
   }
 }

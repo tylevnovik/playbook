@@ -16,6 +16,7 @@ import '../../../../domain/usecases/load_character.dart';
 import '../../../../domain/usecases/manage_chat.dart';
 import '../../../../domain/usecases/send_message.dart';
 import '../../../../domain/usecases/build_prompt.dart';
+import '../../../../core/utils/llm_parser.dart';
 import 'chat_event.dart';
 import 'chat_state.dart';
 
@@ -75,6 +76,13 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       (messages) async {
         if (messages.isEmpty && characters.isNotEmpty) {
           final firstChar = characters.first;
+          final isGreetingDialogue = firstChar.greeting.trim().startsWith('"') ||
+              firstChar.greeting.trim().startsWith('“') ||
+              firstChar.greeting.trim().startsWith('「') ||
+              firstChar.greeting.trim().startsWith('‘') ||
+              firstChar.greeting.trim().startsWith("'");
+          final greetingSenderId = isGreetingDialogue ? firstChar.id : 'dm';
+          
           final greetingMsg = Message(
             id: 'greeting_${DateTime.now().millisecondsSinceEpoch}',
             chatId: chat.id,
@@ -82,7 +90,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
             role: MessageRole.assistant,
             content: firstChar.greeting,
             createdAt: DateTime.now(),
-            senderId: firstChar.id,
+            senderId: greetingSenderId,
           );
           await manageChat.repository.saveMessage(greetingMsg);
           messages.add(greetingMsg);
@@ -102,6 +110,9 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
         final storyStatesResult = await storyStateRepository.getStoryStates(chat.id);
         final storyStates = storyStatesResult.fold((_) => <StoryState>[], (list) => list);
+
+        final usernameResult = await getIt<SettingsRepository>().getString(AppConstants.keyUsername);
+        final username = usernameResult.fold((_) => 'User', (val) => val ?? 'User');
 
         final allMessagesResult = await manageChat.getMessages(chat.id);
         allMessagesResult.fold((failure) => emit(ChatError(failure.message)), (
@@ -131,6 +142,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
                   : null,
               activeCharacterId: activeCharId,
               storyStates: storyStates,
+              username: username,
             ),
           );
         });
@@ -178,6 +190,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         content: event.content,
         attachments: event.attachments,
         createdAt: DateTime.now(),
+        senderId: event.senderId,
       );
       await manageChat.repository.saveMessage(userMessage);
 
@@ -216,6 +229,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         username: username,
         userDescription: userDescription,
         summary: currentSummary,
+        allAvailableCharacters: currentState.allAvailableCharacters,
       );
 
       await promptMessagesResult.fold(
@@ -277,15 +291,76 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           if (hasError) {
             emit(ChatError(errorMessage ?? '生成失败。'));
           } else {
-            await manageChat.repository.saveMessage(assistantMessage);
+            final rawText = contentBuffer.toString();
+            final blocks = LlmParser.parseBlocks(rawText);
 
-            await _loadMessagesAndBranches(
-              currentState.characters,
-              currentState.chat,
-              activeId,
-              assistantMsgId,
-              emit,
-            );
+            if (blocks.isEmpty) {
+              await manageChat.repository.saveMessage(assistantMessage);
+              await _loadMessagesAndBranches(
+                currentState.characters,
+                currentState.chat,
+                activeId,
+                assistantMsgId,
+                emit,
+              );
+            } else if (blocks.length == 1 &&
+                       (blocks.first.speakerName == 'default' ||
+                        blocks.first.speakerName.toLowerCase() == activeChar.name.toLowerCase())) {
+              final parsedMsg = assistantMessage.copyWith(content: blocks.first.content);
+              await manageChat.repository.saveMessage(parsedMsg);
+              await _loadMessagesAndBranches(
+                currentState.characters,
+                currentState.chat,
+                activeId,
+                assistantMsgId,
+                emit,
+              );
+            } else {
+              String parentId = userMsgId;
+              String? lastSavedId;
+              
+              for (int i = 0; i < blocks.length; i++) {
+                final block = blocks[i];
+                
+                String? blockSenderId;
+                final speakerNameLower = block.speakerName.toLowerCase();
+                if (speakerNameLower == 'dm' ||
+                    speakerNameLower == 'narrator' ||
+                    block.speakerName == '旁白') {
+                  blockSenderId = 'dm';
+                } else {
+                  final matchedChar = currentState.characters.firstWhereOrNull(
+                    (c) => c.name.toLowerCase() == block.speakerName.toLowerCase()
+                  ) ?? currentState.allAvailableCharacters.firstWhereOrNull(
+                    (c) => c.name.toLowerCase() == block.speakerName.toLowerCase()
+                  );
+                  blockSenderId = matchedChar?.id ?? activeChar.id;
+                }
+
+                final blockMsgId = (DateTime.now().millisecondsSinceEpoch + i * 2).toString();
+                final blockMsg = Message(
+                  id: blockMsgId,
+                  chatId: currentState.chat.id,
+                  parentId: parentId,
+                  role: MessageRole.assistant,
+                  content: block.content,
+                  createdAt: DateTime.now(),
+                  senderId: blockSenderId,
+                );
+                
+                await manageChat.repository.saveMessage(blockMsg);
+                parentId = blockMsgId;
+                lastSavedId = blockMsgId;
+              }
+
+              await _loadMessagesAndBranches(
+                currentState.characters,
+                currentState.chat,
+                activeId,
+                lastSavedId,
+                emit,
+              );
+            }
           }
         },
       );

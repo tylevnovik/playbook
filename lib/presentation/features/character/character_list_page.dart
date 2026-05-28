@@ -191,6 +191,11 @@ class _CharacterListPageState extends State<CharacterListPage> {
         title: Text(loc.get('characters')),
         actions: [
           IconButton(
+            icon: const Icon(Icons.psychology_outlined),
+            tooltip: 'AI 设定提取',
+            onPressed: () => context.go('/extractor'),
+          ),
+          IconButton(
             icon: const Icon(Icons.upload_file_outlined),
             tooltip: loc.get('importCharacter'),
             onPressed: _importCharacter,

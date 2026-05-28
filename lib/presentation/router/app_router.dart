@@ -9,6 +9,7 @@ import '../features/character/character_list_page.dart';
 import '../features/chat/chat_page.dart';
 import '../features/worldbook/world_book_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/extractor/worldview_extractor_page.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -64,6 +65,13 @@ class AppRouter {
             path: '/settings',
             builder: (context, state) => const SettingsPage(),
           ),
+          GoRoute(
+            path: '/extractor',
+            builder: (context, state) {
+              final chatId = state.uri.queryParameters['chatId'];
+              return WorldviewExtractorPage(initialChatId: chatId);
+            },
+          ),
         ],
       ),
     ],
@@ -72,7 +80,8 @@ class AppRouter {
   static int _selectedIndexFor(String location) {
     if (location.startsWith('/characters')) return 1;
     if (location.startsWith('/worldbook')) return 2;
-    if (location.startsWith('/settings')) return 3;
+    if (location.startsWith('/extractor')) return 3;
+    if (location.startsWith('/settings')) return 4;
     return 0;
   }
 }

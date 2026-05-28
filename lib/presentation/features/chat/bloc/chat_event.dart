@@ -17,9 +17,12 @@ class LoadChat extends ChatEvent {
 class SendChatMessage extends ChatEvent {
   final String content;
   final List<MessageAttachment>? attachments;
-  SendChatMessage(this.content, {this.attachments});
+  final String? senderId;
+
+  SendChatMessage(this.content, {this.attachments, this.senderId});
+
   @override
-  List<Object?> get props => [content, attachments];
+  List<Object?> get props => [content, attachments, senderId];
 }
 
 class SwitchChatBranch extends ChatEvent {
