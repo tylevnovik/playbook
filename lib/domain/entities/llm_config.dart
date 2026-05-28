@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum LlmProviderType { openai, anthropic, gemini }
+enum LlmProviderType { openai, anthropic, gemini, mimo, tokenPlan, deepseek }
 
 class LlmConfig extends Equatable {
   final String? providerId;

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dartz/dartz.dart';
+import 'package:dio/dio.dart';
 import '../../../core/error/failures.dart';
 import '../../../domain/entities/llm_config.dart';
 import '../../../domain/entities/message.dart';
@@ -22,6 +24,9 @@ class LlmRepositoryImpl implements LlmRepository {
   LlmProvider _getProvider(LlmProviderType type) {
     switch (type) {
       case LlmProviderType.openai:
+      case LlmProviderType.mimo:
+      case LlmProviderType.tokenPlan:
+      case LlmProviderType.deepseek:
         return _openAiProvider;
       case LlmProviderType.anthropic:
         return _anthropicProvider;
@@ -45,7 +50,8 @@ class LlmRepositoryImpl implements LlmRepository {
       );
       return Right(response.content);
     } catch (e) {
-      return Left(ApiFailure(e.toString()));
+      final failure = await _handleError(e);
+      return Left(failure);
     }
   }
 
@@ -67,7 +73,8 @@ class LlmRepositoryImpl implements LlmRepository {
         }
       }
     } catch (e) {
-      yield Left(ApiFailure(e.toString()));
+      final failure = await _handleError(e);
+      yield Left(failure);
     }
   }
 
@@ -91,7 +98,62 @@ class LlmRepositoryImpl implements LlmRepository {
       );
       return Right(response.content);
     } catch (e) {
-      return Left(ApiFailure(e.toString()));
+      final failure = await _handleError(e);
+      return Left(failure);
     }
+  }
+
+  Future<Failure> _handleError(Object error) async {
+    if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      final data = error.response?.data;
+      String message = error.message ?? error.toString();
+
+      if (data is Map) {
+        final errorObj = data['error'];
+        if (errorObj is Map && errorObj['message'] is String) {
+          message = errorObj['message'] as String;
+        } else if (data['message'] is String) {
+          message = data['message'] as String;
+        }
+      } else if (data is ResponseBody) {
+        try {
+          final List<int> bytes = [];
+          await for (final chunk in data.stream) {
+            bytes.addAll(chunk);
+          }
+          if (bytes.isNotEmpty) {
+            final jsonStr = utf8.decode(bytes);
+            final decoded = jsonDecode(jsonStr);
+            if (decoded is Map) {
+              final errorObj = decoded['error'];
+              if (errorObj is Map && errorObj['message'] is String) {
+                message = errorObj['message'] as String;
+              } else if (decoded['message'] is String) {
+                message = decoded['message'] as String;
+              }
+            }
+          }
+        } catch (_) {}
+      } else if (data is String) {
+        try {
+          final decoded = jsonDecode(data);
+          if (decoded is Map) {
+            final errorObj = decoded['error'];
+            if (errorObj is Map && errorObj['message'] is String) {
+              message = errorObj['message'] as String;
+            } else if (decoded['message'] is String) {
+              message = decoded['message'] as String;
+            }
+          }
+        } catch (_) {
+          if (data.trim().isNotEmpty) {
+            message = data;
+          }
+        }
+      }
+      return ApiFailure(message, statusCode: statusCode);
+    }
+    return ApiFailure(error.toString());
   }
 }

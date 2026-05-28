@@ -280,6 +280,57 @@ class SettingsRepositoryImpl implements SettingsRepository {
         maxTokens: AppConstants.defaultGeminiMaxResponseTokens,
         isBuiltIn: true,
       ),
+      LlmProviderProfile(
+        id: AppConstants.profileMimoOfficial,
+        name: 'Xiaomi Mimo',
+        providerType: LlmProviderType.mimo,
+        apiKey: _prefs.getString(AppConstants.keyMimoApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyMimoBaseUrl,
+          AppConstants.defaultMimoBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyMimoModel,
+          AppConstants.defaultMimoModel,
+        ),
+        contextWindow: AppConstants.defaultMimoContextTokens,
+        maxTokens: AppConstants.defaultMimoMaxResponseTokens,
+        isBuiltIn: true,
+      ),
+      LlmProviderProfile(
+        id: AppConstants.profileTokenPlanOfficial,
+        name: 'Xiaomi Token Plan',
+        providerType: LlmProviderType.tokenPlan,
+        apiKey: _prefs.getString(AppConstants.keyTokenPlanApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyTokenPlanBaseUrl,
+          AppConstants.defaultTokenPlanBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyTokenPlanModel,
+          AppConstants.defaultTokenPlanModel,
+        ),
+        contextWindow: AppConstants.defaultTokenPlanContextTokens,
+        maxTokens: AppConstants.defaultTokenPlanMaxResponseTokens,
+        isBuiltIn: true,
+      ),
+      LlmProviderProfile(
+        id: AppConstants.profileDeepseekOfficial,
+        name: 'DeepSeek',
+        providerType: LlmProviderType.deepseek,
+        apiKey: _prefs.getString(AppConstants.keyDeepseekApiKey) ?? '',
+        baseUrl: _stringOrDefault(
+          AppConstants.keyDeepseekBaseUrl,
+          AppConstants.defaultDeepseekBaseUrl,
+        ),
+        model: _stringOrDefault(
+          AppConstants.keyDeepseekModel,
+          AppConstants.defaultDeepseekModel,
+        ),
+        contextWindow: AppConstants.defaultDeepseekContextTokens,
+        maxTokens: AppConstants.defaultDeepseekMaxResponseTokens,
+        isBuiltIn: true,
+      ),
     ];
   }
 

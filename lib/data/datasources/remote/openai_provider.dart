@@ -119,7 +119,16 @@ class OpenAiProvider implements LlmProvider {
   String _baseUrl(LlmConfig config) {
     final value = config.baseUrl?.trim();
     if (value == null || value.isEmpty) {
-      return AppConstants.defaultOpenaiBaseUrl;
+      switch (config.providerType) {
+        case LlmProviderType.mimo:
+          return AppConstants.defaultMimoBaseUrl;
+        case LlmProviderType.tokenPlan:
+          return AppConstants.defaultTokenPlanBaseUrl;
+        case LlmProviderType.deepseek:
+          return AppConstants.defaultDeepseekBaseUrl;
+        default:
+          return AppConstants.defaultOpenaiBaseUrl;
+      }
     }
     return value;
   }

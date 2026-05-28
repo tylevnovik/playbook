@@ -166,6 +166,9 @@ class _ApiConfigSectionState extends State<ApiConfigSection> {
       LlmProviderType.openai => Icons.hub_outlined,
       LlmProviderType.anthropic => Icons.psychology_outlined,
       LlmProviderType.gemini => Icons.auto_awesome_outlined,
+      LlmProviderType.mimo => Icons.bolt_outlined,
+      LlmProviderType.tokenPlan => Icons.receipt_long_outlined,
+      LlmProviderType.deepseek => Icons.explore_outlined,
     };
   }
 }
@@ -471,6 +474,9 @@ class _ProviderEditorState extends State<_ProviderEditor> {
       LlmProviderType.openai => loc.get('openaiCompatibleFormat'),
       LlmProviderType.anthropic => loc.get('anthropicCompatibleFormat'),
       LlmProviderType.gemini => loc.get('geminiCompatibleFormat'),
+      LlmProviderType.mimo => loc.get('mimoCompatibleFormat'),
+      LlmProviderType.tokenPlan => loc.get('tokenPlanCompatibleFormat'),
+      LlmProviderType.deepseek => loc.get('deepseekCompatibleFormat'),
     };
   }
 

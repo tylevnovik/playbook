@@ -50,10 +50,13 @@ class ApiDiagnosticsService {
 
     try {
       final response = switch (providerType) {
-        LlmProviderType.openai => await _dio.get(
+        LlmProviderType.openai ||
+        LlmProviderType.mimo ||
+        LlmProviderType.tokenPlan ||
+        LlmProviderType.deepseek => await _dio.get(
           _joinOpenAiCompatiblePath(
             baseUrl,
-            'models/${Uri.encodeComponent(model)}',
+            'models',
           ),
           options: Options(headers: _openAiHeaders(apiKey)),
         ),
@@ -105,7 +108,10 @@ class ApiDiagnosticsService {
 
     try {
       final response = switch (providerType) {
-        LlmProviderType.openai => await _dio.get(
+        LlmProviderType.openai ||
+        LlmProviderType.mimo ||
+        LlmProviderType.tokenPlan ||
+        LlmProviderType.deepseek => await _dio.get(
           _joinOpenAiCompatiblePath(baseUrl, 'models'),
           options: Options(headers: _openAiHeaders(apiKey)),
         ),
@@ -130,7 +136,10 @@ class ApiDiagnosticsService {
       }
 
       final models = switch (providerType) {
-        LlmProviderType.openai => _parseOpenAiModels(response.data),
+        LlmProviderType.openai ||
+        LlmProviderType.mimo ||
+        LlmProviderType.tokenPlan ||
+        LlmProviderType.deepseek => _parseOpenAiModels(response.data),
         LlmProviderType.anthropic => _parseAnthropicModels(response.data),
         LlmProviderType.gemini => _parseGeminiModels(response.data),
       };
@@ -159,6 +168,9 @@ class ApiDiagnosticsService {
       LlmProviderType.openai => AppConstants.defaultOpenaiBaseUrl,
       LlmProviderType.anthropic => AppConstants.defaultAnthropicBaseUrl,
       LlmProviderType.gemini => AppConstants.defaultGeminiBaseUrl,
+      LlmProviderType.mimo => AppConstants.defaultMimoBaseUrl,
+      LlmProviderType.tokenPlan => AppConstants.defaultTokenPlanBaseUrl,
+      LlmProviderType.deepseek => AppConstants.defaultDeepseekBaseUrl,
     };
   }
 
@@ -167,6 +179,9 @@ class ApiDiagnosticsService {
       LlmProviderType.openai => AppConstants.defaultOpenaiModel,
       LlmProviderType.anthropic => AppConstants.defaultAnthropicModel,
       LlmProviderType.gemini => AppConstants.defaultGeminiModel,
+      LlmProviderType.mimo => AppConstants.defaultMimoModel,
+      LlmProviderType.tokenPlan => AppConstants.defaultTokenPlanModel,
+      LlmProviderType.deepseek => AppConstants.defaultDeepseekModel,
     };
   }
 
@@ -188,6 +203,24 @@ class ApiDiagnosticsService {
         'gemini-3.1-pro',
         'gemini-3.1-flash',
       ],
+      LlmProviderType.mimo => const [
+        'mimo-v2.5-pro',
+        'mimo-v2.5',
+        'mimo-v2-pro',
+        'mimo-v2-flash',
+        'mimo-v2-omni',
+      ],
+      LlmProviderType.tokenPlan => const [
+        'mimo-v2.5-pro',
+        'mimo-v2.5',
+        'mimo-v2-pro',
+        'mimo-v2-flash',
+        'mimo-v2-omni',
+      ],
+      LlmProviderType.deepseek => const [
+        'deepseek-v4-pro',
+        'deepseek-v4-flash',
+      ],
     };
   }
 
@@ -196,6 +229,9 @@ class ApiDiagnosticsService {
       LlmProviderType.openai => AppConstants.defaultOpenaiContextTokens,
       LlmProviderType.anthropic => AppConstants.defaultAnthropicContextTokens,
       LlmProviderType.gemini => AppConstants.defaultGeminiContextTokens,
+      LlmProviderType.mimo => AppConstants.defaultMimoContextTokens,
+      LlmProviderType.tokenPlan => AppConstants.defaultTokenPlanContextTokens,
+      LlmProviderType.deepseek => AppConstants.defaultDeepseekContextTokens,
     };
   }
 
@@ -205,6 +241,9 @@ class ApiDiagnosticsService {
       LlmProviderType.anthropic =>
         AppConstants.defaultAnthropicMaxResponseTokens,
       LlmProviderType.gemini => AppConstants.defaultGeminiMaxResponseTokens,
+      LlmProviderType.mimo => AppConstants.defaultMimoMaxResponseTokens,
+      LlmProviderType.tokenPlan => AppConstants.defaultTokenPlanMaxResponseTokens,
+      LlmProviderType.deepseek => AppConstants.defaultDeepseekMaxResponseTokens,
     };
   }
 
