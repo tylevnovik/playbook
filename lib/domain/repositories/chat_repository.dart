@@ -18,4 +18,5 @@ abstract class ChatRepository {
   Future<Either<Failure, Message>> saveMessage(Message message);
   Future<Either<Failure, List<Message>>> getBranchMessages(String chatId, String? leafMessageId);
   Future<Either<Failure, List<Message>>> getMessageBranches(String chatId, String parentId);
+  Future<Either<Failure, void>> toggleMessageCanon(String messageId, bool isCanon);
 }

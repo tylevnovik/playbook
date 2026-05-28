@@ -25,13 +25,14 @@ class BuildPrompt {
     required List<Message> messages,
     required LlmConfig config,
     String? username,
+    String? userDescription,
     String? summary,
   }) async {
     final promptMessages = <Message>[];
     int tokenBudget = config.contextWindow - config.maxTokens;
 
     // 1. System prompt
-    final systemPrompt = _buildSystemPrompt(activeCharacter, allCharacters, username);
+    final systemPrompt = _buildSystemPrompt(activeCharacter, allCharacters, username, userDescription);
     promptMessages.add(Message(
       id: 'system',
       chatId: '',
@@ -173,8 +174,14 @@ class BuildPrompt {
     return Right(promptMessages);
   }
 
-  String _buildSystemPrompt(Character activeCharacter, List<Character> allCharacters, String? username) {
+  String _buildSystemPrompt(
+    Character activeCharacter,
+    List<Character> allCharacters,
+    String? username,
+    String? userDescription,
+  ) {
     final userName = username ?? 'User';
+    final userDesc = userDescription ?? '';
     final customPrompt = activeCharacter.systemPrompt ?? '';
     
     final otherChars = allCharacters.where((c) => c.id != activeCharacter.id);
@@ -196,6 +203,6 @@ $customPrompt
 - Respond as ${activeCharacter.name} would, based on the character description
 - Use * for actions, " for dialogue
 - Keep responses engaging and in-character
-- The user's name is $userName''';
+- The user's name is $userName${userDesc.isNotEmpty ? '\n- The user\'s description/role is: $userDesc' : ''}''';
   }
 }

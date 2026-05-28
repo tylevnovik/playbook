@@ -186,6 +186,9 @@ class _HomeMobileView extends StatelessWidget {
                       }
                     }
                   },
+                  onEdit: () {
+                    context.push('/character/${character.id}');
+                  },
                   onDelete: () {
                     context.read<HomeBloc>().add(DeleteCharacter(character.id));
                   },

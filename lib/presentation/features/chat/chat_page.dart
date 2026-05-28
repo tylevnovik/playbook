@@ -17,6 +17,7 @@ import 'bloc/chat_state.dart';
 import 'widgets/chat_bubble.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/chat_drawer.dart';
+import 'widgets/worldview_extractor_dialog.dart';
 
 class ChatPage extends StatefulWidget {
   final String chatId;
@@ -137,6 +138,11 @@ class _ChatPageState extends State<ChatPage> {
             ],
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.psychology),
+              tooltip: 'AI 世界设定提取',
+              onPressed: () => _showWorldviewExtractorDialog(context, state),
+            ),
             Builder(
               builder: (context) => IconButton(
                 icon: const Icon(Icons.tune),
@@ -196,40 +202,7 @@ class _ChatPageState extends State<ChatPage> {
                       itemCount: messages.length,
                       itemBuilder: (context, index) {
                         final msg = messages[index];
-                        final parentId = msg.parentId;
-                        int branchCount = 1;
-                        int currentBranchIndex = 0;
-                        if (parentId != null) {
-                          final siblings = state.branches[parentId] ?? [];
-                          branchCount = siblings.length;
-                          currentBranchIndex = siblings.indexWhere(
-                            (m) => m.id == msg.id,
-                          );
-                          if (currentBranchIndex == -1) currentBranchIndex = 0;
-                        }
-
-                        final senderChar = state.characters.firstWhereOrNull((c) => c.id == msg.senderId) ??
-                            (state.characters.isNotEmpty ? state.characters.first : null);
-                        final charName = senderChar?.name ?? 'Assistant';
-                        final charAvatar = senderChar?.avatarPath;
-
-                        return ChatBubble(
-                          message: msg,
-                          characterName: charName,
-                          characterAvatar: charAvatar,
-                          branchCount: branchCount,
-                          currentBranchIndex: currentBranchIndex,
-                          onPreviousBranch: () {
-                            context.read<ChatBloc>().add(
-                              SwitchToSiblingBranch(msg.id, next: false),
-                            );
-                          },
-                          onNextBranch: () {
-                            context.read<ChatBloc>().add(
-                              SwitchToSiblingBranch(msg.id, next: true),
-                            );
-                          },
-                        );
+                        return _buildChatBubble(context, state, msg);
                       },
                     ),
             ),
@@ -323,6 +296,11 @@ class _ChatPageState extends State<ChatPage> {
                   ],
                 ),
                 actions: [
+                  IconButton(
+                    icon: const Icon(Icons.psychology),
+                    tooltip: 'AI 世界设定提取',
+                    onPressed: () => _showWorldviewExtractorDialog(context, state),
+                  ),
                   Builder(
                     builder: (context) => IconButton(
                       icon: const Icon(Icons.tune),
@@ -383,42 +361,7 @@ class _ChatPageState extends State<ChatPage> {
                             itemCount: messages.length,
                             itemBuilder: (context, index) {
                               final msg = messages[index];
-                              final parentId = msg.parentId;
-                              int branchCount = 1;
-                              int currentBranchIndex = 0;
-                              if (parentId != null) {
-                                final siblings = state.branches[parentId] ?? [];
-                                branchCount = siblings.length;
-                                currentBranchIndex = siblings.indexWhere(
-                                  (m) => m.id == msg.id,
-                                );
-                                if (currentBranchIndex == -1) {
-                                  currentBranchIndex = 0;
-                                }
-                              }
-
-                              final senderChar = state.characters.firstWhereOrNull((c) => c.id == msg.senderId) ??
-                                  (state.characters.isNotEmpty ? state.characters.first : null);
-                              final charName = senderChar?.name ?? 'Assistant';
-                              final charAvatar = senderChar?.avatarPath;
-
-                              return ChatBubble(
-                                message: msg,
-                                characterName: charName,
-                                characterAvatar: charAvatar,
-                                branchCount: branchCount,
-                                currentBranchIndex: currentBranchIndex,
-                                onPreviousBranch: () {
-                                  context.read<ChatBloc>().add(
-                                    SwitchToSiblingBranch(msg.id, next: false),
-                                  );
-                                },
-                                onNextBranch: () {
-                                  context.read<ChatBloc>().add(
-                                    SwitchToSiblingBranch(msg.id, next: true),
-                                  );
-                                },
-                              );
+                              return _buildChatBubble(context, state, msg);
                             },
                           ),
                   ),
@@ -500,6 +443,181 @@ class _ChatPageState extends State<ChatPage> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  void _showWorldviewExtractorDialog(BuildContext context, ChatLoaded state) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return WorldviewExtractorDialog(
+          chatState: state,
+          chatBloc: context.read<ChatBloc>(),
+        );
+      },
+    );
+  }
+
+  void _showExtractToWorldBookDialog(BuildContext context, ChatLoaded state, String text) {
+    final nameController = TextEditingController(
+      text: text.length > 20 ? '${text.substring(0, 17)}...' : text,
+    );
+    final keywordsController = TextEditingController();
+    final contentController = TextEditingController(text: text);
+    String category = 'general';
+    String? selectedWbId = state.worldBooks.isNotEmpty ? state.worldBooks.first.id : null;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: const Text('提取到世界书'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: '条目名称'),
+                ),
+                TextField(
+                  controller: keywordsController,
+                  decoration: const InputDecoration(labelText: '触发关键字 (逗号分隔)'),
+                ),
+                TextField(
+                  controller: contentController,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: '设定内容'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: category,
+                  decoration: const InputDecoration(labelText: '类别'),
+                  items: const [
+                    DropdownMenuItem(value: 'general', child: Text('常规设定')),
+                    DropdownMenuItem(value: 'character', child: Text('角色状态')),
+                    DropdownMenuItem(value: 'location', child: Text('地点环境')),
+                    DropdownMenuItem(value: 'event', child: Text('事件伏笔')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) category = val;
+                  },
+                ),
+                if (state.worldBooks.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedWbId,
+                    decoration: const InputDecoration(labelText: '选择世界书'),
+                    items: state.worldBooks.map((wb) {
+                      return DropdownMenuItem(value: wb.id, child: Text(wb.name));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) selectedWbId = val;
+                    },
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      '未绑定世界书，保存后将自动为您创建一本新世界书并绑定。',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final entryName = nameController.text.trim();
+                final entryContent = contentController.text.trim();
+                final kwList = keywordsController.text
+                    .split(',')
+                    .map((k) => k.trim())
+                    .where((k) => k.isNotEmpty)
+                    .toList();
+
+                if (entryName.isEmpty || entryContent.isEmpty) {
+                  return;
+                }
+
+                Navigator.pop(dialogCtx);
+
+                context.read<ChatBloc>().add(
+                  ImportExtractedEntities(
+                    characters: const [],
+                    entries: [
+                      {
+                        'name': entryName,
+                        'keywords': kwList,
+                        'content': entryContent,
+                        'category': category,
+                        'priority': 0,
+                      }
+                    ],
+                  ),
+                );
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('成功提取并保存至世界书')),
+                );
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChatBubble(BuildContext context, ChatLoaded state, Message msg) {
+    final parentId = msg.parentId;
+    int branchCount = 1;
+    int currentBranchIndex = 0;
+    if (parentId != null) {
+      final siblings = state.branches[parentId] ?? [];
+      branchCount = siblings.length;
+      currentBranchIndex = siblings.indexWhere((m) => m.id == msg.id);
+      if (currentBranchIndex == -1) currentBranchIndex = 0;
+    }
+
+    final senderChar = state.characters.firstWhereOrNull((c) => c.id == msg.senderId) ??
+        (state.characters.isNotEmpty ? state.characters.first : null);
+    final charName = senderChar?.name ?? 'Assistant';
+    final charAvatar = senderChar?.avatarPath;
+
+    return ChatBubble(
+      message: msg,
+      characterName: charName,
+      characterAvatar: charAvatar,
+      branchCount: branchCount,
+      currentBranchIndex: currentBranchIndex,
+      availableCharacters: state.characters,
+      onPreviousBranch: () {
+        context.read<ChatBloc>().add(SwitchToSiblingBranch(msg.id, next: false));
+      },
+      onNextBranch: () {
+        context.read<ChatBloc>().add(SwitchToSiblingBranch(msg.id, next: true));
+      },
+      onToggleCanon: () {
+        context.read<ChatBloc>().add(ToggleMessageCanon(messageId: msg.id, isCanon: !msg.isCanon));
+      },
+      onEditMessage: (newContent) {
+        context.read<ChatBloc>().add(EditMessage(messageId: msg.id, newContent: newContent));
+      },
+      onRewrite: (selectedText, instruction, senderId) {
+        context.read<ChatBloc>().add(RewriteMessage(
+          messageId: msg.id,
+          selectedText: selectedText,
+          instruction: instruction,
+          senderId: senderId,
+        ));
+      },
+      onExtractToWorldBook: (selectedText) {
+        _showExtractToWorldBookDialog(context, state, selectedText);
+      },
     );
   }
 }

@@ -151,4 +151,14 @@ class ChatRepositoryImpl implements ChatRepository {
       return Left(DatabaseFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> toggleMessageCanon(String messageId, bool isCanon) async {
+    try {
+      await _messageDao.setMessageCanon(messageId, isCanon);
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
 }

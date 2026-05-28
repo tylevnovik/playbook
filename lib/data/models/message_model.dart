@@ -21,6 +21,7 @@ class MessageModel {
       attachments: attachments,
       tokensUsed: map['tokens_used'] as int?,
       createdAt: DateTime.parse(map['created_at'] as String),
+      isCanon: (map['is_canon'] as int? ?? 0) == 1,
       senderId: map['sender_id'] as String?,
     );
   }
@@ -40,6 +41,7 @@ class MessageModel {
           : null,
       'tokens_used': message.tokensUsed,
       'created_at': message.createdAt.toIso8601String(),
+      'is_canon': message.isCanon ? 1 : 0,
       'sender_id': message.senderId,
     };
   }

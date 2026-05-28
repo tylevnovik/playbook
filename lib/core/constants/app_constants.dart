@@ -1,7 +1,7 @@
 class AppConstants {
   static const String appName = 'Playbook';
   static const String dbName = 'playbook.db';
-  static const int dbVersion = 3;
+  static const int dbVersion = 4;
 
   // Token limits (default, overridable per model)
   static const int defaultMaxContextTokens = 8000;
@@ -57,6 +57,7 @@ class AppConstants {
   static const String keyLanguage = 'language';
   static const String keyPrimaryColor = 'primary_color';
   static const String keyUsername = 'username';
+  static const String keyUserDescription = 'user_description';
   static const String keyDefaultProvider = 'default_provider';
   static const String keyProviderProfiles = 'provider_profiles';
   static const String keyDefaultProviderProfileId =

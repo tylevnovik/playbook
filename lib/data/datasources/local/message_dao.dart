@@ -48,7 +48,11 @@ class MessageDao {
         orderBy: 'created_at ASC',
       );
       if (roots.isNotEmpty) {
-        return await _buildBranch(chatId, roots.first['id'] as String);
+        final canonRoot = roots.firstWhere(
+          (r) => r['is_canon'] == 1,
+          orElse: () => roots.first,
+        );
+        return await _buildBranch(chatId, canonRoot['id'] as String);
       }
     }
     
@@ -65,10 +69,61 @@ class MessageDao {
       messages.add(msg);
       
       final children = await getChildren(currentId);
-      currentId = children.isNotEmpty ? children.first['id'] as String? : null;
+      if (children.isEmpty) {
+        currentId = null;
+      } else {
+        final canonChild = children.firstWhere(
+          (c) => c['is_canon'] == 1,
+          orElse: () => children.first,
+        );
+        currentId = canonChild['id'] as String;
+      }
     }
     
     return messages;
+  }
+
+  Future<void> setMessageCanon(String id, bool isCanon) async {
+    final db = await DatabaseService.database;
+    final msg = await getById(id);
+    if (msg == null) return;
+    
+    final parentId = msg['parent_id'] as String?;
+    final chatId = msg['chat_id'] as String;
+    
+    if (isCanon) {
+      // Clear canon flag for all siblings (sharing same parentId and chatId)
+      if (parentId != null) {
+        await db.update(
+          'messages',
+          {'is_canon': 0},
+          where: 'chat_id = ? AND parent_id = ?',
+          whereArgs: [chatId, parentId],
+        );
+      } else {
+        await db.update(
+          'messages',
+          {'is_canon': 0},
+          where: 'chat_id = ? AND parent_id IS NULL',
+          whereArgs: [chatId],
+        );
+      }
+      
+      // Set canon flag for the target message
+      await db.update(
+        'messages',
+        {'is_canon': 1},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    } else {
+      await db.update(
+        'messages',
+        {'is_canon': 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
   }
 
   Future<void> insert(Map<String, dynamic> data) async {

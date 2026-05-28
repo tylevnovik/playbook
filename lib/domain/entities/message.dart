@@ -18,6 +18,7 @@ class Message extends Equatable {
   final List<MessageAttachment>? attachments;
   final int? tokensUsed;
   final DateTime createdAt;
+  final bool isCanon;
   final String? senderId;
 
   const Message({
@@ -29,9 +30,36 @@ class Message extends Equatable {
     this.attachments,
     this.tokensUsed,
     required this.createdAt,
+    this.isCanon = false,
     this.senderId,
   });
 
+  Message copyWith({
+    String? id,
+    String? chatId,
+    String? parentId,
+    MessageRole? role,
+    String? content,
+    List<MessageAttachment>? attachments,
+    int? tokensUsed,
+    DateTime? createdAt,
+    bool? isCanon,
+    String? senderId,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      chatId: chatId ?? this.chatId,
+      parentId: parentId ?? this.parentId,
+      role: role ?? this.role,
+      content: content ?? this.content,
+      attachments: attachments ?? this.attachments,
+      tokensUsed: tokensUsed ?? this.tokensUsed,
+      createdAt: createdAt ?? this.createdAt,
+      isCanon: isCanon ?? this.isCanon,
+      senderId: senderId ?? this.senderId,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, chatId, parentId, role, content, senderId];
+  List<Object?> get props => [id, chatId, parentId, role, content, isCanon, senderId];
 }

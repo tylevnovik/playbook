@@ -50,6 +50,20 @@ class DataSection extends StatelessWidget {
               onChanged: (val) =>
                   onUpdateSetting(AppConstants.keyUsername, val),
             ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: ValueKey(
+                '${AppConstants.keyUserDescription}_${values[AppConstants.keyUserDescription] ?? ''}',
+              ),
+              initialValue: values[AppConstants.keyUserDescription],
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: '玩家设定',
+                hintText: '描述你在聊天中扮演的玩家角色的背景、身份或性格...',
+              ),
+              onChanged: (val) =>
+                  onUpdateSetting(AppConstants.keyUserDescription, val),
+            ),
             const SizedBox(height: 24),
 
             // Data actions

@@ -29,6 +29,7 @@ class SendMessage {
     required String content,
     String? senderId,
     List<MessageAttachment>? attachments,
+    String? parentId,
   }) async {
     final chatResult = await chatRepository.getChat(chatId);
     return await chatResult.fold((failure) async => Left(failure), (chat) async {
@@ -55,12 +56,18 @@ class SendMessage {
             (_) => 'User',
             (val) => val ?? 'User',
           );
+          final userDescResult = await settingsRepository.getString(AppConstants.keyUserDescription);
+          final userDescription = userDescResult.fold(
+            (_) => '',
+            (val) => val ?? '',
+          );
 
-          final messagesResult = await chatRepository.getMessages(chatId);
+          final messagesResult = await chatRepository.getBranchMessages(chatId, parentId);
           return await messagesResult.fold((failure) async => Left(failure), (messages) async {
             final userMessage = Message(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
               chatId: chatId,
+              parentId: parentId,
               role: MessageRole.user,
               content: content,
               attachments: attachments,
@@ -93,6 +100,7 @@ class SendMessage {
                 messages: [...messages, userMessage],
                 config: config,
                 username: username,
+                userDescription: userDescription,
                 summary: currentSummary,
               );
 
@@ -107,6 +115,7 @@ class SendMessage {
                   final assistantMessage = Message(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
                     chatId: chatId,
+                    parentId: userMessage.id,
                     role: MessageRole.assistant,
                     content: responseContent,
                     createdAt: DateTime.now(),

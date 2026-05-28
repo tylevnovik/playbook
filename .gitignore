@@ -86,3 +86,6 @@ dist/
 *.ipa
 *.app
 *.exe
+
+# E2E test tools
+/tool/

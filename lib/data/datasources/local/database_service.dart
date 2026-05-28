@@ -113,6 +113,7 @@ class DatabaseService {
         attachments TEXT,
         tokens_used INTEGER,
         created_at TEXT NOT NULL,
+        is_canon INTEGER DEFAULT 0,
         sender_id TEXT,
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
         FOREIGN KEY (parent_id) REFERENCES messages(id),
@@ -353,6 +354,14 @@ class DatabaseService {
         )
       ''');
       await db.execute('CREATE INDEX IF NOT EXISTS idx_story_states_chat ON story_states(chat_id)');
+    }
+
+    if (oldVersion < 4) {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(messages)');
+      final hasIsCanon = tableInfo.any((column) => column['name'] == 'is_canon');
+      if (!hasIsCanon) {
+        await db.execute('ALTER TABLE messages ADD COLUMN is_canon INTEGER DEFAULT 0');
+      }
     }
   }
 

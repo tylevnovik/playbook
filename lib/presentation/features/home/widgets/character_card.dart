@@ -4,12 +4,14 @@ import '../../../../domain/entities/character.dart';
 class CharacterCard extends StatelessWidget {
   final Character character;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const CharacterCard({
     super.key,
     required this.character,
     required this.onTap,
+    required this.onEdit,
     required this.onDelete,
   });
 
@@ -92,7 +94,7 @@ class CharacterCard extends StatelessWidget {
               title: const Text('Edit'),
               onTap: () {
                 Navigator.pop(context);
-                onTap();
+                onEdit();
               },
             ),
             ListTile(

@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import '../../../../domain/entities/character.dart';
 import '../../../../domain/entities/chat.dart';
 import '../../../../domain/entities/message.dart';
@@ -6,11 +7,15 @@ import '../../../../domain/entities/world_book.dart';
 import '../../../../domain/entities/story_state.dart';
 import '../../../../domain/repositories/world_book_repository.dart';
 import '../../../../domain/repositories/story_state_repository.dart';
+import '../../../../domain/repositories/settings_repository.dart';
+import '../../../../domain/repositories/llm_repository.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/id_generator.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../domain/usecases/load_character.dart';
 import '../../../../domain/usecases/manage_chat.dart';
 import '../../../../domain/usecases/send_message.dart';
+import '../../../../domain/usecases/build_prompt.dart';
 import 'chat_event.dart';
 import 'chat_state.dart';
 
@@ -36,6 +41,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<AddStoryState>(_onAddStoryState);
     on<UpdateStoryStateEvent>(_onUpdateStoryState);
     on<DeleteStoryStateEvent>(_onDeleteStoryState);
+    on<ToggleMessageCanon>(_onToggleMessageCanon);
+    on<EditMessage>(_onEditMessage);
+    on<RewriteMessage>(_onRewriteMessage);
+    on<ImportExtractedEntities>(_onImportExtractedEntities);
   }
 
   Future<void> _onLoadChat(LoadChat event, Emitter<ChatState> emit) async {
@@ -138,8 +147,31 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       final currentLeaf = currentState.currentLeafMessageId;
       final activeCharId = currentState.activeCharacterId;
 
+      final configResult = await getIt<SettingsRepository>().getDefaultLlmConfig();
+      final config = configResult.fold((_) => null, (c) => c);
+      if (config == null) {
+        emit(ChatError('无法获取 LLM 配置，请检查设置。'));
+        return;
+      }
+
+      final activeId = (activeCharId != null && currentState.chat.characterIds.contains(activeCharId))
+          ? activeCharId
+          : currentState.chat.characterIds.first;
+      final activeChar = currentState.characters.firstWhereOrNull((c) => c.id == activeId);
+      if (activeChar == null) {
+        emit(ChatError('无法获取当前角色。'));
+        return;
+      }
+
+      final usernameResult = await getIt<SettingsRepository>().getString(AppConstants.keyUsername);
+      final username = usernameResult.fold((_) => 'User', (val) => val ?? 'User');
+
+      final userDescResult = await getIt<SettingsRepository>().getString(AppConstants.keyUserDescription);
+      final userDescription = userDescResult.fold((_) => '', (val) => val ?? '');
+
+      final userMsgId = DateTime.now().millisecondsSinceEpoch.toString();
       final userMessage = Message(
-        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+        id: userMsgId,
         chatId: currentState.chat.id,
         parentId: currentLeaf,
         role: MessageRole.user,
@@ -147,48 +179,116 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         attachments: event.attachments,
         createdAt: DateTime.now(),
       );
+      await manageChat.repository.saveMessage(userMessage);
 
-      final List<Message> updatedMessages = List.from(currentState.messages)
-        ..add(userMessage);
-
+      final List<Message> messagesWithUser = List.from(currentState.messages)..add(userMessage);
       emit(
         currentState.copyWith(
-          messages: updatedMessages,
-          currentLeafMessageId: userMessage.id,
+          messages: messagesWithUser,
+          currentLeafMessageId: userMsgId,
         ),
       );
 
-      final result = await sendMessage(
+      String? currentSummary = currentState.chat.summary;
+      if (messagesWithUser.length >= AppConstants.defaultSummaryThreshold &&
+          (currentSummary == null || currentSummary.trim().isEmpty)) {
+        final summarizeResult = await getIt<LlmRepository>().summarize(
+          messages: messagesWithUser,
+          config: config,
+        );
+        await summarizeResult.fold(
+          (_) async => null,
+          (newSummary) async {
+            currentSummary = newSummary;
+            final updatedChat = currentState.chat.copyWith(summary: newSummary);
+            await manageChat.repository.updateChat(updatedChat);
+          },
+        );
+      }
+
+      final promptMessagesResult = await getIt<BuildPrompt>().call(
         chatId: currentState.chat.id,
-        content: event.content,
-        senderId: activeCharId,
-        attachments: event.attachments,
+        activeCharacter: activeChar,
+        allCharacters: currentState.characters,
+        worldBookIds: currentState.chat.worldBookIds,
+        messages: messagesWithUser,
+        config: config,
+        username: username,
+        userDescription: userDescription,
+        summary: currentSummary,
       );
 
-      await result.fold((failure) async => emit(ChatError(failure.message)), (
-        savedAssistantMsg,
-      ) async {
-        final linkedAssistantMsg = Message(
-          id: savedAssistantMsg.id,
-          chatId: savedAssistantMsg.chatId,
-          parentId: userMessage.id,
-          role: savedAssistantMsg.role,
-          content: savedAssistantMsg.content,
-          attachments: savedAssistantMsg.attachments,
-          tokensUsed: savedAssistantMsg.tokensUsed,
-          createdAt: savedAssistantMsg.createdAt,
-          senderId: savedAssistantMsg.senderId,
-        );
-        await manageChat.repository.saveMessage(linkedAssistantMsg);
+      await promptMessagesResult.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (promptMessages) async {
+          final assistantMsgId = (DateTime.now().millisecondsSinceEpoch + 1).toString();
+          Message assistantMessage = Message(
+            id: assistantMsgId,
+            chatId: currentState.chat.id,
+            parentId: userMsgId,
+            role: MessageRole.assistant,
+            content: '',
+            createdAt: DateTime.now(),
+            senderId: activeChar.id,
+          );
 
-        await _loadMessagesAndBranches(
-          currentState.characters,
-          currentState.chat,
-          activeCharId,
-          linkedAssistantMsg.id,
-          emit,
-        );
-      });
+          final List<Message> messagesWithAssistant = List.from(messagesWithUser)..add(assistantMessage);
+          emit(
+            currentState.copyWith(
+              messages: messagesWithAssistant,
+              currentLeafMessageId: assistantMsgId,
+            ),
+          );
+
+          final stream = getIt<LlmRepository>().streamMessage(
+            messages: promptMessages,
+            config: config,
+            attachments: event.attachments,
+          );
+
+          final contentBuffer = StringBuffer();
+          bool hasError = false;
+          String? errorMessage;
+
+          await for (final chunkResult in stream) {
+            await chunkResult.fold(
+              (failure) async {
+                hasError = true;
+                errorMessage = failure.message;
+              },
+              (chunkText) async {
+                contentBuffer.write(chunkText);
+                assistantMessage = assistantMessage.copyWith(content: contentBuffer.toString());
+                
+                final updatedList = messagesWithAssistant.map((m) {
+                  return m.id == assistantMsgId ? assistantMessage : m;
+                }).toList();
+
+                emit(
+                  currentState.copyWith(
+                    messages: updatedList,
+                  ),
+                );
+              },
+            );
+            if (hasError) break;
+          }
+
+          if (hasError) {
+            emit(ChatError(errorMessage ?? '生成失败。'));
+          } else {
+            await manageChat.repository.saveMessage(assistantMessage);
+
+            await _loadMessagesAndBranches(
+              currentState.characters,
+              currentState.chat,
+              activeId,
+              assistantMsgId,
+              emit,
+            );
+          }
+        },
+      );
     }
   }
 
@@ -384,6 +484,242 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           );
         },
       );
+    }
+  }
+
+  Future<void> _onToggleMessageCanon(
+    ToggleMessageCanon event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      final result = await manageChat.repository.toggleMessageCanon(event.messageId, event.isCanon);
+      await result.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (_) async {
+          await _loadMessagesAndBranches(
+            currentState.characters,
+            currentState.chat,
+            currentState.activeCharacterId,
+            currentState.currentLeafMessageId,
+            emit,
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _onEditMessage(
+    EditMessage event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      final oldMsgResult = await manageChat.repository.getMessage(event.messageId);
+      await oldMsgResult.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (oldMsg) async {
+          final newMsg = Message(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            chatId: oldMsg.chatId,
+            parentId: oldMsg.parentId,
+            role: oldMsg.role,
+            content: event.newContent,
+            attachments: oldMsg.attachments,
+            createdAt: DateTime.now(),
+            senderId: oldMsg.senderId,
+          );
+          final saveResult = await manageChat.repository.saveMessage(newMsg);
+          await saveResult.fold(
+            (failure) async => emit(ChatError(failure.message)),
+            (savedMsg) async {
+              await _loadMessagesAndBranches(
+                currentState.characters,
+                currentState.chat,
+                currentState.activeCharacterId,
+                savedMsg.id,
+                emit,
+              );
+            },
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _onRewriteMessage(
+    RewriteMessage event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      emit(ChatLoading());
+      
+      final oldMsgResult = await manageChat.repository.getMessage(event.messageId);
+      await oldMsgResult.fold(
+        (failure) async => emit(ChatError(failure.message)),
+        (oldMsg) async {
+          final configResult = await getIt<SettingsRepository>().getDefaultLlmConfig();
+          await configResult.fold(
+            (failure) async => emit(ChatError(failure.message)),
+            (config) async {
+              final systemPrompt = '''You are a helper that rewrites or continues a selected portion of text in a story.
+Return ONLY the rewritten or continued text. Do not add any conversational filler, explanations, or quotes around the output.
+Instruction: ${event.instruction}
+Selected Text to replace or continue: "${event.selectedText}"''';
+
+              final messages = [
+                Message(
+                  id: 'system',
+                  chatId: '',
+                  role: MessageRole.system,
+                  content: systemPrompt,
+                  createdAt: DateTime.now(),
+                ),
+                Message(
+                  id: 'context',
+                  chatId: '',
+                  role: MessageRole.user,
+                  content: 'Here is the message context:\n${oldMsg.content}',
+                  createdAt: DateTime.now(),
+                ),
+              ];
+
+              final responseResult = await getIt<LlmRepository>().sendMessage(
+                messages: messages,
+                config: config,
+              );
+
+              await responseResult.fold(
+                (failure) async => emit(ChatError(failure.message)),
+                (rewrittenText) async {
+                  String newContent;
+                  if (event.instruction == '续写') {
+                    final index = oldMsg.content.indexOf(event.selectedText);
+                    if (index != -1) {
+                      newContent = '${oldMsg.content.substring(0, index + event.selectedText.length)}\n$rewrittenText${oldMsg.content.substring(index + event.selectedText.length)}';
+                    } else {
+                      newContent = '${oldMsg.content}\n$rewrittenText';
+                    }
+                  } else {
+                    newContent = oldMsg.content.replaceAll(event.selectedText, rewrittenText);
+                  }
+
+                  final newMsg = Message(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    chatId: oldMsg.chatId,
+                    parentId: oldMsg.parentId,
+                    role: oldMsg.role,
+                    content: newContent,
+                    attachments: oldMsg.attachments,
+                    createdAt: DateTime.now(),
+                    senderId: event.senderId ?? oldMsg.senderId,
+                  );
+
+                  final saveResult = await manageChat.repository.saveMessage(newMsg);
+                  await saveResult.fold(
+                    (failure) async => emit(ChatError(failure.message)),
+                    (savedMsg) async {
+                      await _loadMessagesAndBranches(
+                        currentState.characters,
+                        currentState.chat,
+                        currentState.activeCharacterId,
+                        savedMsg.id,
+                        emit,
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      );
+    }
+  }
+
+  Future<void> _onImportExtractedEntities(
+    ImportExtractedEntities event,
+    Emitter<ChatState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is ChatLoaded) {
+      emit(ChatLoading());
+      
+      try {
+        final List<String> newCharIds = List.from(currentState.chat.characterIds);
+        for (final charMap in event.characters) {
+          final char = Character(
+            id: IdGenerator.generate(),
+            name: charMap['name'] ?? 'AI Character',
+            avatarPath: '',
+            description: charMap['description'] ?? '',
+            greeting: charMap['greeting'] ?? '',
+            tags: const [],
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await loadCharacter.characterRepository.createCharacter(char);
+          newCharIds.add(char.id);
+        }
+
+        String worldBookId;
+        final List<String> newWbIds = List.from(currentState.chat.worldBookIds);
+        if (newWbIds.isNotEmpty) {
+          worldBookId = newWbIds.first;
+        } else {
+          final firstCharName = currentState.characters.isNotEmpty ? currentState.characters.first.name : 'Chat';
+          final newWb = WorldBook(
+            id: IdGenerator.generate(),
+            name: '$firstCharName World Book',
+            description: 'Auto-extracted from background settings',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await getIt<WorldBookRepository>().createWorldBook(newWb);
+          newWbIds.add(newWb.id);
+          worldBookId = newWb.id;
+        }
+
+        for (final entryMap in event.entries) {
+          final entry = WorldBookEntry(
+            id: IdGenerator.generate(),
+            worldBookId: worldBookId,
+            name: entryMap['name'] ?? 'Entry',
+            keywords: List<String>.from(entryMap['keywords'] ?? []),
+            content: entryMap['content'] ?? '',
+            category: entryMap['category'] ?? 'general',
+            priority: entryMap['priority'] ?? 0,
+            enabled: true,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          await getIt<WorldBookRepository>().createEntry(entry);
+        }
+
+        final updatedChat = currentState.chat.copyWith(
+          characterIds: newCharIds,
+          worldBookIds: newWbIds,
+          updatedAt: DateTime.now(),
+        );
+        await manageChat.repository.updateChat(updatedChat);
+
+        final List<Character> newCharacters = [];
+        for (final charId in newCharIds) {
+          final charRes = await loadCharacter.characterRepository.getCharacter(charId);
+          charRes.fold((_) => null, (c) => newCharacters.add(c));
+        }
+
+        await _loadMessagesAndBranches(
+          newCharacters,
+          updatedChat,
+          currentState.activeCharacterId ?? (newCharIds.isNotEmpty ? newCharIds.first : null),
+          currentState.currentLeafMessageId,
+          emit,
+        );
+      } catch (e) {
+        emit(ChatError(e.toString()));
+      }
     }
   }
 }
