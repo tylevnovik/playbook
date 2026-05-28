@@ -8,12 +8,16 @@ Playbook is a modern, responsive, and feature-rich Flutter application designed 
 
 ## Key Features
 
-- 🎭 **Character Creator & Editor**: Easily build, configure, and customize characters. Define their name, avatar, personality descriptions, prompt contexts, first messages, and system instructions.
+- 🎭 **Character Management**: Build, configure, and customize characters. Define their name, avatar, personality descriptions, prompt contexts, first messages, and system instructions. Features a dedicated Character Management view for better role separation.
 - 📚 **World Book (Lore) Management**: Create and manage world lore entries, terms, and backgrounds. Let your characters reference background information dynamically during conversations.
 - 💬 **Interactive Chat Room**:
   - Immersive dialogue interface supporting full **Markdown** rendering.
   - Interactive input box with token estimation and real-time validation.
   - Multi-session management with historical chat threads.
+  - 👥 **Multi-Character Group Chat & DM Mode**: Run roleplays with multiple characters in a single chat room. The AI acts as a Dungeon Master (DM) and orchestrator, supporting scene narrations under `[DM]` and distinct character dialogues with `[Character Name]` prefixes.
+  - 🧠 **Smart Context Recall & Auto-Summarization**: Dynamically manage context window budgets, automatically summarizing older conversation history using the LLM when thresholds are reached, and recalling matching contexts automatically.
+- 🔮 **AI Worldview Extractor**: Analyze large background texts or past chat histories to automatically parse and extract structured character profiles and world book lore entries, importing them to new/existing world books with one click.
+- 📌 **Story State & Tracking**: Add, edit, and toggle 6 categories of story state constraints (Character, Location, Event, Relationship, Taboo, Style) dynamically in the chat settings drawer to maintain plot consistency and writing rules.
 - ⚙️ **Custom API Configuration**: Set up custom API endpoints (OpenAI-compatible), custom model names, API keys, temperature, and maximum token outputs.
 - 🎨 **Modern & Adaptive UI**:
   - Material 3 Design with **Dynamic Color** theming (syncs with OS accent color).
@@ -94,14 +98,15 @@ lib/
 │   ├── models/                            # Data models & serializations
 │   └── repositories/                      # Repository implementations
 ├── domain/                                # Domain layer (interfaces & core models)
-│   ├── models/                            # Plain entity classes (Character, Chat, WorldBook)
+│   ├── entities/                          # Plain entity classes (Character, Chat, Message, StoryState, WorldBook, LlmConfig)
 │   └── repositories/                      # Repository abstract contracts
 └── presentation/                          # Presentation layer (UI & state)
     ├── common/                            # Common widgets (Responsive, Sidebar, Scaffolds)
     ├── router/                            # Routing configuration (go_router)
     └── features/                          # Feature blocks
         ├── character/                     # Character Creator/Edit page and BLoC
-        ├── chat/                          # Chat Interface, Bubble, Input, and BLoC
+        ├── chat/                          # Chat Interface, Bubble, Input, Drawer, and BLoC
+        ├── extractor/                     # AI Worldview Extractor page and BLoC
         ├── home/                          # Home screen Grid and BLoC
         ├── settings/                      # Config panel, Theme/Data settings, and BLoC
         └── splash/                        # Splash loading page
